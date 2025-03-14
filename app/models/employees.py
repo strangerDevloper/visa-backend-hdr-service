@@ -16,6 +16,8 @@ class EmployeeHdr(Base):
     is_absent = Column(Boolean, default=False)
     absence_expiry = Column(DateTime, nullable=True) # or DateTime, depending on your needs.
     password_hash = Column(String, nullable=False)
+    last_login = Column(DateTime, nullable=True)
+    login_count = Column(Integer, default=0)
     created_by = Column(Integer, ForeignKey('employee_hdr.employee_id'))
     created_date = Column(DateTime, server_default=func.now())
     modified_by = Column(Integer, ForeignKey('employee_hdr.employee_id'))

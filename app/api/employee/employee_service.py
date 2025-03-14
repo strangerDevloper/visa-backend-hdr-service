@@ -4,6 +4,7 @@ from ... import models
 from . import employee_types
 from ...helpers import auth_utils
 import uuid
+from datetime import datetime 
 
 def create_employee(db: Session, employee: employee_types.EmployeeCreate, created_by: int = None):
     db_employee = models.EmployeeHdr(**employee.dict())
@@ -23,6 +24,9 @@ def get_employee(db: Session, employee_id: int):
 
 def get_employee_by_uid(db: Session, emp_uid: str):
     return db.query(models.EmployeeHdr).filter(models.EmployeeHdr.emp_uid == emp_uid).first()
+
+def get_employee_by_email(db: Session, email: str):
+    return db.query(models.EmployeeHdr).filter(models.EmployeeHdr.email == email).first()
 
 def get_employees(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.EmployeeHdr).offset(skip).limit(limit).all()

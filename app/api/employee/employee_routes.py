@@ -41,9 +41,10 @@ def delete_employee(employee_id: int, db: Session = Depends(get_db), token: str 
 
 @router.post("/signin", response_model=employee_types.Token)
 def signin(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    db_employee = employee_service.get_employee_by_uid(db, form_data.username)
+    db_employee = employee_service.get_employee_by_email(db, form_data.username) # Use email
+    print("db employee" , db_employee)
     if not db_employee or not auth_utils.verify_password(form_data.password, db_employee.password_hash):
-        raise HTTPException(status_code=401, detail="Incorrect username or password")
+        raise HTTPException(status_code=401, detail="Incorrect email or password") #Updated error message
     access_token = auth_utils.create_access_token(data={"sub": str(db_employee.employee_id)})
     employee_service.update_login_info(db, db_employee.employee_id)
     return employee_types.Token(access_token=access_token)
