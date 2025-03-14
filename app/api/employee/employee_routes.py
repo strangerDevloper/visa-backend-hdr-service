@@ -1,0 +1,49 @@
+# app/api/employee/employee_routes.py (Routes)
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from ...database import get_db
+from . import employee_types, employee_service
+from ...helpers import auth_utils
+from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordBearer
+
+router = APIRouter(prefix="/employees", tags=["employees"])
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/employees/signin")
+
+@router.post("/", response_model=employee_types.Employee, status_code=status.HTTP_201_CREATED)
+def create_employee(employee: employee_types.EmployeeCreate, db: Session = Depends(get_db)):
+    return employee_service.create_employee(db, employee)
+
+@router.get("/{employee_id}", response_model=employee_types.Employee)
+def read_employee(employee_id: int, db: Session = Depends(get_db)):
+    db_employee = employee_service.get_employee(db, employee_id)
+    if db_employee is None:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    return db_employee
+
+@router.get("/", response_model=list[employee_types.Employee])
+def read_employees(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    return employee_service.get_employees(db, skip=skip, limit=limit)
+
+@router.put("/{employee_id}", response_model=employee_types.Employee)
+def update_employee(employee_id: int, employee_update: employee_types.EmployeeUpdate, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+    db_employee = employee_service.update_employee(db, employee_id, employee_update)
+    if db_employee is None:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    return db_employee
+
+@router.delete("/{employee_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_employee(employee_id: int, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+    db_employee = employee_service.delete_employee(db, employee_id)
+    if db_employee is None:
+      raise HTTPException(status_code=404, detail="Employee not found")
+    return
+
+@router.post("/signin", response_model=employee_types.Token)
+def signin(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    db_employee = employee_service.get_employee_by_uid(db, form_data.username)
+    if not db_employee or not auth_utils.verify_password(form_data.password, db_employee.password_hash):
+        raise HTTPException(status_code=401, detail="Incorrect username or password")
+    access_token = auth_utils.create_access_token(data={"sub": str(db_employee.employee_id)})
+    employee_service.update_login_info(db, db_employee.employee_id)
+    return employee_types.Token(access_token=access_token)
