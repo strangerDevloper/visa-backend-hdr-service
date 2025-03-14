@@ -2,7 +2,7 @@
 from fastapi import FastAPI, status
 from fastapi.responses import JSONResponse
 from . import models, database
-from .api import  users_router
+from .api import users_router, employee_router 
 from .database import Base, engine
 from dotenv import load_dotenv
 import uvicorn
@@ -15,6 +15,8 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI()
 
 app.include_router(users_router)
+app.include_router(employee_router) #Add employee router
+
 
 @app.get("/health", status_code=status.HTTP_200_OK)
 def health_check():
