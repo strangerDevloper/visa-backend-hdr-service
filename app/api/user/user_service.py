@@ -54,3 +54,18 @@ def update_login_info(db: Session, user_id: int):
       db.commit()
       db.refresh(db_user)
     return db_user
+
+def get_user(db: Session, user_id: int):
+    """Retrieves a user by their ID."""
+    return db.query(models.User).filter(models.User.user_id == user_id).first()
+
+def get_all_users(db: Session):
+    """Retrieves all users."""
+    return db.query(models.User).all()
+
+def get_active_users_paginated(db: Session, skip: int = 0, limit: int = 10):
+    """Retrieves active users with pagination and returns total count."""
+    query = db.query(models.User).filter(models.User.active_status == True)
+    total_count = query.count()
+    users = query.offset(skip).limit(limit).all()
+    return users, total_count
