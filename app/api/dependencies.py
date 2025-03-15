@@ -11,21 +11,6 @@ from ..core import constants
 employee_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/employees/signin")
 user_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/users/signin")
 
-# def get_user_from_token(token: str, is_employee: bool):
-#     """Extracts user ID and type from token."""
-#     user_data = auth_utils.extract_user_data(token)
-#     if user_data is None:
-#         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-#     user_id, user_type = user_data
-
-#     expected_user_type = constants.USER_TYPE_EMPLOYEE if is_employee else constants.USER_TYPE_USER
-#     if user_type != expected_user_type:
-#         raise HTTPException(
-#             status_code=status.HTTP_403_FORBIDDEN,
-#             detail=f"Unauthorized access. Expected user type: {expected_user_type}, but got: {user_type}",
-#         )
-#     return user_id, user_type
-
 def get_user_from_token(token: str):
     """Extracts user ID and type from token."""
     user_data = auth_utils.extract_user_data(token)

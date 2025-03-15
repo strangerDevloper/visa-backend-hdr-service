@@ -2,7 +2,7 @@
 from fastapi import FastAPI, status
 from fastapi.responses import JSONResponse
 from . import models, database
-from .api import users_router, employee_router 
+from .api import users_router, employee_router, country_router  # Import country routes 
 from .database import Base, engine
 from dotenv import load_dotenv
 import uvicorn
@@ -16,6 +16,7 @@ app = FastAPI()
 
 app.include_router(users_router)
 app.include_router(employee_router) #Add employee router
+app.include_router(country_router)  # Include country routes
 
 
 @app.get("/health", status_code=status.HTTP_200_OK)
