@@ -31,7 +31,8 @@ def read_employees(current_employee: CurrentEmployee, skip: int = 0, limit: int 
 
 
 @router.put("/{employee_id}", response_model=employee_types.Employee)
-def update_employee(employee_id: int, employee_update: employee_types.EmployeeUpdate, current_employee: CurrentEmployee , db: Session = Depends(get_db)):
+def update_employee(employee_id: int, employee_update: employee_types.EmployeeUpdate, current_employee: CurrentEmployee, db: Session = Depends(get_db)):
+    print("hereeee")
     db_employee = employee_service.update_employee(db, employee_id, employee_update, current_employee.employee_id)
     if db_employee is None:
         raise HTTPException(status_code=404, detail="Employee not found")

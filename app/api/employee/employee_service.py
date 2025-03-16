@@ -1,6 +1,7 @@
 # app/api/employee/employee_service.py
 from sqlalchemy.orm import Session # type: ignore
 from ... import models
+from ...models.employees import Gender, MaritalStatus, IDProofType
 from . import employee_types
 from ...helpers import auth_utils
 import uuid
@@ -8,8 +9,6 @@ from datetime import datetime
 from typing import Tuple, List
 
 def create_employee(db: Session, employee: employee_types.EmployeeCreate, created_by: int):
-    # ... your asynchronous create_employee logic ...
-    print("inside service")
     db_employee = models.EmployeeHdr(**employee.dict())
     db_employee.created_by = created_by
     db_employee.emp_uid = str(uuid.uuid4())
@@ -39,17 +38,29 @@ def get_employees(db: Session, skip: int = 0, limit: int = 100) -> Tuple[List[mo
 def update_employee(db: Session, employee_id: int, employee_update: employee_types.EmployeeUpdate, modified_by: int = None):
     db_employee = db.query(models.EmployeeHdr).filter(models.EmployeeHdr.employee_id == employee_id).first()
     if db_employee:
-        for key, value in employee_update.dict(exclude_unset=True).items():
+        update_data = employee_update.dict(exclude_unset=True)
+        
+        # Convert string values to Enum values
+        if "gender" in update_data and update_data["gender"] is not None:
+            update_data["gender"] = Gender[update_data["gender"].upper()]  # Use the Gender enum
+        if "marital_status" in update_data and update_data["marital_status"] is not None:
+            update_data["marital_status"] = MaritalStatus[update_data["marital_status"].upper()]  # Use the MaritalStatus enum
+        if "id_proof_type" in update_data and update_data["id_proof_type"] is not None:
+            update_data["id_proof_type"] = IDProofType[update_data["id_proof_type"].upper()]  # Use the IDProofType enum
+
+        # Update the employee fields
+        for key, value in update_data.items():
             if key == "password":
                 setattr(db_employee, "password_hash", auth_utils.get_password_hash(value))
             else:
                 setattr(db_employee, key, value)
+
         if modified_by:
             db_employee.modified_by = modified_by
+
         db.commit()
         db.refresh(db_employee)
     return db_employee
-
 def delete_employee(db: Session, employee_id: int, modified_by: int = None):
     db_employee = db.query(models.EmployeeHdr).filter(models.EmployeeHdr.employee_id == employee_id).first()
     if db_employee:
@@ -63,8 +74,8 @@ def delete_employee(db: Session, employee_id: int, modified_by: int = None):
 def update_login_info(db: Session, employee_id: int):
     db_employee = db.query(models.EmployeeHdr).filter(models.EmployeeHdr.employee_id == employee_id).first()
     if db_employee:
-      db_employee.last_login = datetime.utcnow()
-      db_employee.login_count += 1
-      db.commit()
-      db.refresh(db_employee)
+        db_employee.last_login = datetime.utcnow()
+        db_employee.login_count += 1
+        db.commit()
+        db.refresh(db_employee)
     return db_employee
