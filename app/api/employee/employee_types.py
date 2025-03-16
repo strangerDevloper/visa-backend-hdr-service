@@ -89,3 +89,19 @@ class Employee(EmployeeBase):
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+class EmployeeRoleCreate(BaseModel):
+    role_id: int  # Only role_id is needed in the payload
+
+class EmployeeRoleUpdate(BaseModel):
+    role_id: int  # Only role_id is needed in the payload
+
+class EmployeeRoleResponse(BaseModel):
+    employee_role_id: int
+    employee_id: int
+    role_id: int
+    assigned_at: datetime
+    assigned_by: int
+
+    class Config:
+        orm_mode = True

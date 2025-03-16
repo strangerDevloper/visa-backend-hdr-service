@@ -32,7 +32,6 @@ def read_employees(current_employee: CurrentEmployee, skip: int = 0, limit: int 
 
 @router.put("/{employee_id}", response_model=employee_types.Employee)
 def update_employee(employee_id: int, employee_update: employee_types.EmployeeUpdate, current_employee: CurrentEmployee, db: Session = Depends(get_db)):
-    print("hereeee")
     db_employee = employee_service.update_employee(db, employee_id, employee_update, current_employee.employee_id)
     if db_employee is None:
         raise HTTPException(status_code=404, detail="Employee not found")
@@ -42,6 +41,86 @@ def update_employee(employee_id: int, employee_update: employee_types.EmployeeUp
 def delete_employee(employee_id: int, current_employee: CurrentEmployee, db: Session = Depends(get_db)):
     employee_service.delete_employee(db, employee_id, current_employee.employee_id)
     return
+
+@router.post("/{employee_id}/roles", response_model=employee_types.EmployeeRoleResponse, status_code=status.HTTP_201_CREATED)
+def assign_role_to_employee(
+    employee_id: int,
+    employee_role: employee_types.EmployeeRoleCreate,
+    current_employee: CurrentEmployee,
+    db: Session = Depends(get_db),
+):
+    """
+    Assign a role to an employee.
+    """
+    return employee_service.assign_role_to_employee(db, employee_id, employee_role.role_id, current_employee.employee_id)
+
+@router.put("/{employee_id}/roles/{employee_role_id}", response_model=employee_types.EmployeeRoleResponse)
+def update_employee_role(
+    employee_id: int,
+    employee_role_id: int,
+    employee_role_update: employee_types.EmployeeRoleUpdate,
+    current_employee: CurrentEmployee,
+    db: Session = Depends(get_db),
+):
+    """
+    Update an existing role assignment for an employee.
+    """
+    db_employee_role = employee_service.update_employee_role(db, employee_role_id, employee_role_update.role_id, current_employee.employee_id)
+    if db_employee_role is None:
+        raise HTTPException(status_code=404, detail="Role assignment not found")
+    return db_employee_role
+
+@router.get("/{employee_id}/roles", response_model=list[employee_types.EmployeeRoleResponse])
+def get_roles_for_employee(
+    employee_id: int,
+    current_employee: CurrentEmployee,
+    db: Session = Depends(get_db),
+):
+    """
+    Get all role assignments for a specific employee.
+    """
+    return employee_service.get_roles_for_employee(db, employee_id)
+
+@router.get("/{employee_id}/roles/{employee_role_id}", response_model=employee_types.EmployeeRoleResponse)
+def get_employee_role(
+    employee_id: int,
+    employee_role_id: int,
+    current_employee: CurrentEmployee,
+    db: Session = Depends(get_db),
+):
+    """
+    Get a specific role assignment by ID.
+    """
+    db_employee_role = employee_service.get_employee_role(db, employee_role_id)
+    if db_employee_role is None:
+        raise HTTPException(status_code=404, detail="Role assignment not found")
+    return db_employee_role
+
+@router.get("/{employee_id}/roles", response_model=list[employee_types.EmployeeRoleResponse])
+def get_roles_for_employee(
+    employee_id: int,
+    current_employee: CurrentEmployee,
+    db: Session = Depends(get_db),
+):
+    """
+    Get all role assignments for a specific employee.
+    """
+    return employee_service.get_roles_for_employee(db, employee_id)
+
+@router.get("/roles/{employee_role_id}", response_model=employee_types.EmployeeRoleResponse)
+def get_employee_role(
+    employee_role_id: int,
+    current_employee: CurrentEmployee,
+    db: Session = Depends(get_db),
+):
+    """
+    Get a specific role assignment by ID.
+    """
+    db_employee_role = employee_service.get_employee_role(db, employee_role_id)
+    if db_employee_role is None:
+        raise HTTPException(status_code=404, detail="Role assignment not found")
+    return db_employee_role
+
 
 @router.post("/signin", response_model=employee_types.Token)
 def signin_employee(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
