@@ -270,3 +270,54 @@ def get_roles_for_employee(db: Session, employee_id: int):
     Get all role assignments for a specific employee.
     """
     return db.query(models.EmployeeRole).filter(models.EmployeeRole.employee_id == employee_id).all()
+
+def assign_country_access(db: Session, employee_id: int, country_ids: List[int], granted_by: int):
+    """
+    Assign access to multiple countries for an employee.
+    """
+    try:
+        for country_id in country_ids:
+            db_access = models.EmployeeVisaTypeAccess(
+                employee_id=employee_id,
+                country_id=country_id,
+                granted_by=granted_by,
+            )
+            db.add(db_access)
+        db.commit()
+        return db.query(models.EmployeeVisaTypeAccess).filter(models.EmployeeVisaTypeAccess.employee_id == employee_id).all()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"An error occurred while assigning country access: {str(e)}",
+        )
+
+def remove_country_access(db: Session, employee_id: int, country_ids: List[int]):
+    """
+    Remove access for multiple countries for an employee.
+    """
+    try:
+        db.query(models.EmployeeVisaTypeAccess).filter(
+            models.EmployeeVisaTypeAccess.employee_id == employee_id,
+            models.EmployeeVisaTypeAccess.country_id.in_(country_ids),
+        ).delete(synchronize_session=False)
+        db.commit()
+        return {"message": "Country access removed successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"An error occurred while removing country access: {str(e)}",
+        )
+
+def get_country_access_for_employee(db: Session, employee_id: int):
+    """
+    Get all country access records for an employee.
+    """
+    db_accesses = db.query(models.EmployeeVisaTypeAccess).filter(models.EmployeeVisaTypeAccess.employee_id == employee_id).all()
+    if not db_accesses:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No country access records found for employee with ID {employee_id}",
+        )
+    return db_accesses

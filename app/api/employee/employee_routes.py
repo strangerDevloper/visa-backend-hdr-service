@@ -121,6 +121,52 @@ def get_employee_role(
         raise HTTPException(status_code=404, detail="Role assignment not found")
     return db_employee_role
 
+@router.post("/{employee_id}/country-access", response_model=list[employee_types.EmployeeCountryAccessResponse], status_code=status.HTTP_201_CREATED)
+def assign_country_access_to_employee(
+    employee_id: int,
+    access: employee_types.EmployeeCountryAccessCreate,
+    current_employee: CurrentEmployee,
+    db: Session = Depends(get_db),
+):
+    """
+    Assign access to multiple countries for an employee.
+    """
+    return employee_service.assign_country_access(
+        db,
+        employee_id=employee_id,
+        country_ids=access.country_ids,
+        granted_by=current_employee.employee_id,
+    )
+
+@router.delete("/{employee_id}/country-access", response_model=dict)
+def remove_country_access_from_employee(
+    employee_id: int,
+    remove: employee_types.EmployeeCountryAccessCreate,
+    current_employee: CurrentEmployee,
+    db: Session = Depends(get_db),
+):
+    """
+    Remove access for multiple countries for an employee.
+    """
+    return employee_service.remove_country_access(
+        db,
+        employee_id=employee_id,
+        country_ids=remove.country_ids,
+    )
+
+@router.get("/{employee_id}/country-access", response_model=list[employee_types.EmployeeCountryAccessResponse])
+def get_country_access_for_employee(
+    employee_id: int,
+    current_employee: CurrentEmployee,
+    db: Session = Depends(get_db),
+):
+    """
+    Get all country access records for a specific employee.
+    """
+    return employee_service.get_country_access_for_employee(
+        db,
+        employee_id=employee_id,
+    )
 
 @router.post("/signin", response_model=employee_types.Token)
 def signin_employee(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
