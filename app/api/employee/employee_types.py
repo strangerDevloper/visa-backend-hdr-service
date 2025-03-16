@@ -1,7 +1,7 @@
 # app/api/employee/employee_types.py (Schemas)
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from pydantic import validator
 
 
@@ -102,6 +102,22 @@ class EmployeeRoleResponse(BaseModel):
     role_id: int
     assigned_at: datetime
     assigned_by: int
+
+    class Config:
+        orm_mode = True
+
+class EmployeeCountryAccessBase(BaseModel):
+    country_ids: List[int]  # List of country IDs
+
+class EmployeeCountryAccessCreate(EmployeeCountryAccessBase):
+    pass
+
+class EmployeeCountryAccessResponse(BaseModel):
+    access_id: int
+    employee_id: int
+    country_id: int
+    granted_at: datetime
+    granted_by: int
 
     class Config:
         orm_mode = True
