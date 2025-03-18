@@ -19,4 +19,4 @@ class Country(CountryBase):
     is_active: bool
 
     class Config:
-        orm_mode = True
+        from_attributes = True  # Enable ORM mode for SQLAlchemy models

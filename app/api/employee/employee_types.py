@@ -84,7 +84,7 @@ class Employee(EmployeeBase):
     password: Optional[str] = None  # Added password to return default password on creation.
 
     class Config:
-        orm_mode = True
+        from_attributes = True  # Enable ORM mode for SQLAlchemy models
 
 class Token(BaseModel):
     access_token: str
@@ -104,7 +104,7 @@ class EmployeeRoleResponse(BaseModel):
     assigned_by: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True  # Enable ORM mode for SQLAlchemy models
 
 class EmployeeCountryAccessBase(BaseModel):
     country_ids: List[int]  # List of country IDs
@@ -120,4 +120,4 @@ class EmployeeCountryAccessResponse(BaseModel):
     granted_by: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True  # Enable ORM mode for SQLAlchemy models

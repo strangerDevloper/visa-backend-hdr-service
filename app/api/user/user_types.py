@@ -27,7 +27,7 @@ class User(UserBase):
     changed_on: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True  # Enable ORM mode for SQLAlchemy models
 
 class Token(BaseModel):
     access_token: str

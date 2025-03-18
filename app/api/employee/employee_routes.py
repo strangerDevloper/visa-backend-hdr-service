@@ -96,16 +96,6 @@ def get_employee_role(
         raise HTTPException(status_code=404, detail="Role assignment not found")
     return db_employee_role
 
-@router.get("/{employee_id}/roles", response_model=list[employee_types.EmployeeRoleResponse])
-def get_roles_for_employee(
-    employee_id: int,
-    current_employee: CurrentEmployee,
-    db: Session = Depends(get_db),
-):
-    """
-    Get all role assignments for a specific employee.
-    """
-    return employee_service.get_roles_for_employee(db, employee_id)
 
 @router.get("/roles/{employee_role_id}", response_model=employee_types.EmployeeRoleResponse)
 def get_employee_role(
