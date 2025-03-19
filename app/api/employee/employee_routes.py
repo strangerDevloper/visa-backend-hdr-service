@@ -1,6 +1,8 @@
 # app/api/employee/employee_routes.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+
+from app.core.constants import USER_TYPE_EMPLOYEE
 from ...database import get_db
 from . import employee_types, employee_service
 from ...helpers import auth_utils
@@ -11,7 +13,7 @@ from typing import List, Dict, Union
 
 
 router = APIRouter(prefix="/employees", tags=["employees"])
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/employees/signin") # type: ignore
+# oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/employees/signin") # type: ignore
 
 @router.post("/", response_model=employee_types.Employee, status_code=status.HTTP_201_CREATED)
 def create_employee(employee: employee_types.EmployeeCreate, current_employee: CurrentEmployee, db: Session = Depends(get_db)):
@@ -96,16 +98,6 @@ def get_employee_role(
         raise HTTPException(status_code=404, detail="Role assignment not found")
     return db_employee_role
 
-@router.get("/{employee_id}/roles", response_model=list[employee_types.EmployeeRoleResponse])
-def get_roles_for_employee(
-    employee_id: int,
-    current_employee: CurrentEmployee,
-    db: Session = Depends(get_db),
-):
-    """
-    Get all role assignments for a specific employee.
-    """
-    return employee_service.get_roles_for_employee(db, employee_id)
 
 @router.get("/roles/{employee_role_id}", response_model=employee_types.EmployeeRoleResponse)
 def get_employee_role(
@@ -175,7 +167,7 @@ def signin_employee(form_data: OAuth2PasswordRequestForm = Depends(), db: Sessio
         raise HTTPException(status_code=401, detail="Incorrect email or password")
 
     user_id = db_employee.employee_id
-    user_type = "employee"
+    user_type = USER_TYPE_EMPLOYEE
 
     access_token = auth_utils.create_access_token(data={"sub": str(user_id)}, user_type=user_type)
     employee_service.update_login_info(db, db_employee.employee_id)
