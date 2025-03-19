@@ -42,8 +42,10 @@ def common_signin(
     Common sign-in endpoint for both users and employees.
     The `user_type` parameter specifies whether the user is signing in as a "user" or "employee".
     """
+    user_type = None
     if form_data.grant_type == UserType.USER:
         # Authenticate as a user
+        user_type = USER_TYPE_USER
         db_user = user_service.get_user_by_username(db, form_data.username)
         if not db_user or not auth_utils.verify_password(form_data.password, db_user.password_hash):
             raise HTTPException(status_code=401, detail="Incorrect username or password")
@@ -53,6 +55,7 @@ def common_signin(
     # elif form_data.grant_type == UserType.EMPLOYEE:
     else:
         # Authenticate as an employee
+        user_type = USER_TYPE_EMPLOYEE
         db_employee = employee_service.get_employee_by_email(db, form_data.username)
         if not db_employee or not auth_utils.verify_password(form_data.password, db_employee.password_hash):
             raise HTTPException(status_code=401, detail="Incorrect email or password")
@@ -63,5 +66,5 @@ def common_signin(
     #     raise HTTPException(status_code=400, detail="Invalid user type")
 
     # Generate a token
-    access_token = auth_utils.create_access_token(data={"sub": str(user_id)}, user_type=form_data.grant_type)
+    access_token = auth_utils.create_access_token(data={"sub": str(user_id)}, user_type=user_type)
     return Token(access_token=access_token)
