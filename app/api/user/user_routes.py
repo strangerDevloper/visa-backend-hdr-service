@@ -1,6 +1,8 @@
 # app/api/user/user_routes.py
 from fastapi import APIRouter, Depends, HTTPException, status, Query  # Import Query here!
 from sqlalchemy.orm import Session
+
+from app.core.constants import USER_TYPE_USER
 from ...database import get_db
 from . import user_types, user_service
 from ...helpers import auth_utils
@@ -24,7 +26,7 @@ def signin_user(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
         raise HTTPException(status_code=401, detail="Incorrect email or password")
 
     user_id = db_user.user_id
-    user_type = "user"
+    user_type = USER_TYPE_USER
 
     access_token = auth_utils.create_access_token(data={"sub": str(user_id)}, user_type=user_type)
     user_service.update_login_info(db, db_user.user_id)
