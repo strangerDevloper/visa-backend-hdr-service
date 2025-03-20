@@ -1,7 +1,7 @@
 # app/main.py
 from fastapi import FastAPI, status
 from fastapi.responses import JSONResponse
-from . import models, database
+from fastapi.middleware.cors import CORSMiddleware  # Import CORSMiddleware
 from .api import users_router, employee_router, country_router, common_router, role_router  # Import country routes 
 from .database import Base, engine
 from dotenv import load_dotenv
@@ -13,6 +13,16 @@ load_dotenv()
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
+# Enable CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods (GET, POST, PUT, DELETE, etc.)
+    allow_headers=["*"],  # Allows all headers
+    expose_headers=["*"],  # Exposes all headers in the response
+)
 
 app.include_router(users_router)
 app.include_router(employee_router) #Add employee router
