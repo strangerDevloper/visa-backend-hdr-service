@@ -1,14 +1,14 @@
 # app/api/country/country_routes.py
 import os
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
+from typing import List, Dict, Union, Optional
 
 from app.aws import AWSService
 from ...database import get_db
 from . import country_types, country_service
 from ...api.dependencies import CurrentEmployee
-from typing import List, Dict, Union, Any
 
 router = APIRouter(prefix="/countries", tags=["countries"])
 
@@ -21,7 +21,11 @@ def create_country(
     current_employee: CurrentEmployee,
     db: Session = Depends(get_db),
 ):
-    """Creates a new country."""
+    """
+    Creates a new country.
+    - Media files are optional.
+    - Each media file includes `file_path`, `is_flag`, and `is_icon`.
+    """
     db_country_name_exists = country_service.get_country_by_name(db, country.country_name)
     if db_country_name_exists:
         raise HTTPException(
@@ -34,19 +38,30 @@ def create_country(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Country code already exists"
         )
 
-    return country_service.create_country(db, country, current_employee.employee_id)
+    # Create the country
+    db_country = country_service.create_country(db, country, current_employee.employee_id)
 
-@router.get("/{country_id}", response_model=country_types.Country)
+    # Handle media files (if any)
+    if country.media_files:
+        for media in country.media_files:
+            country_service.add_country_media(db, db_country.country_id, media, current_employee.employee_id)
+
+    return db_country
+
+@router.get("/{country_id}", response_model=country_types.CountryWithMedia)
 def get_country(
     country_id: int,
     current_employee: CurrentEmployee,
     db: Session = Depends(get_db),
 ):
-    """Retrieves a country by its ID."""
+    """Retrieves a country by its ID along with its media."""
     db_country = country_service.get_country(db, country_id)
     if not db_country:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Country not found")
-    return db_country
+
+    # Fetch media files for the country
+    media_files = country_service.get_country_media(db, country_id)
+    return {"country": db_country, "media_files": media_files}
 
 @router.get("/", response_model=Dict[str, Union[List[country_types.Country], int]])
 def get_countries(
@@ -54,13 +69,12 @@ def get_countries(
     db: Session = Depends(get_db),
     skip: int = Query(0, description="Number of items to skip"),
     limit: int = Query(10, description="Number of items to retrieve"),
-    is_active: Union[bool, None] = Query(
-        None, description="Filter by active status (true/false)"
-    ),
+    is_active: Union[bool, None] = Query(None, description="Filter by active status (true/false)"),
+    search: str = Query(None, description="Search by country name"),
 ):
-    """Retrieves a list of countries with pagination, optional filtering, and returns total count."""
+    """Retrieves a list of countries with pagination, optional filtering, and search by name."""
     countries, total_count = country_service.get_countries_paginated(
-        db, skip=skip, limit=limit, is_active=is_active
+        db, skip=skip, limit=limit, is_active=is_active, search=search
     )
     return {"countries": countries, "total_count": total_count}
 
@@ -71,11 +85,20 @@ def update_country(
     current_employee: CurrentEmployee,
     db: Session = Depends(get_db),
 ):
-    """Updates an existing country."""
+    """Updates an existing country with details and optional media files."""
     db_country = country_service.get_country(db, country_id)
     if not db_country:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Country not found")
-    return country_service.update_country(db, country_id, country_update, current_employee.employee_id)
+
+    # Update country details
+    updated_country = country_service.update_country(db, country_id, country_update, current_employee.employee_id)
+
+    # Handle media files (if any)
+    if country_update.media_files:
+        for media in country_update.media_files:
+            country_service.add_country_media(db, country_id, media, current_employee.employee_id)
+
+    return updated_country
 
 @router.delete("/{country_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_country(
@@ -88,43 +111,4 @@ def delete_country(
     if not db_country:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Country not found")
     country_service.deactivate_country(db, country_id, current_employee.employee_id)
-    return
-
-
-@router.post("/upload-image")
-async def upload_country_image(
-    country_id: int,
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db)
-):
-    """
-    Upload a country image to the S3 bucket.
-    
-    :param file: Image file to upload
-    :param country_id: ID of the country (used to create a folder path)
-    :return: S3 object URL
-    """
-    try:
-        # Define the folder path (e.g., 'countries/{country_id}/images/')
-        folder_path = f"countries/{country_id}/images"
-
-        # Save the file temporarily
-        temp_file_path = f"/tmp/{file.filename}"
-        with open(temp_file_path, "wb") as buffer:
-            buffer.write(await file.read())
-
-        # Upload the file to S3
-        object_url = aws_service.upload_file(temp_file_path, folder_path)
-
-        # Clean up the temporary file
-        os.remove(temp_file_path)
-
-        return JSONResponse(content={"message": "Country image uploaded successfully", "object_url": object_url})
-
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An error occurred: {str(e)}"
-        )
+    return JSONResponse(status_code=status.HTTP_204_NO_CONTENT)
