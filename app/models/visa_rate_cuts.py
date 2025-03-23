@@ -8,12 +8,15 @@ class VisaRateCut(Base):
 
     visa_rate_cut_id = Column(Integer, primary_key=True, autoincrement=True)
     visa_process_id = Column(Integer, ForeignKey('visa_process_hdr.visa_process_id'), nullable=False)
-    process_fee = Column(Integer, nullable=False)
-    applicable_date = Column(DateTime)
-    end_date = Column(DateTime, nullable=True) # Assuming end_date can be null
-    created_by = Column(Integer, ForeignKey('employee_hdr.employee_id'))
+    government_fee = Column(Integer, nullable=False)
+    service_fee = Column(Integer, nullable=False) 
     tax = Column(Integer, nullable=True) # Assuming tax can be null
-    is_active = Column(Boolean, default=True)
+    start_date = Column(DateTime)
+    end_date = Column(DateTime, nullable=True) # Assuming end_date can be null
+    is_active = Column(Boolean, default=False)
+    is_default = Column(Boolean, default=False)
+    created_date = Column(DateTime, server_default=func.now())
+    created_by = Column(Integer, ForeignKey('employee_hdr.employee_id'))
 
     visa_process = relationship("VisaProcessHdr")
     creator = relationship("EmployeeHdr")
