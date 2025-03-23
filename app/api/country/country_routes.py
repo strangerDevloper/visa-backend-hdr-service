@@ -1,12 +1,19 @@
 # app/api/country/country_routes.py
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+import os
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status, Query
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
+
+from app.aws import AWSService
 from ...database import get_db
 from . import country_types, country_service
 from ...api.dependencies import CurrentEmployee
 from typing import List, Dict, Union, Any
 
 router = APIRouter(prefix="/countries", tags=["countries"])
+
+# Initialize the AWS Service
+aws_service = AWSService()
 
 @router.post("/", response_model=country_types.Country, status_code=status.HTTP_201_CREATED)
 def create_country(
@@ -82,3 +89,42 @@ def delete_country(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Country not found")
     country_service.deactivate_country(db, country_id, current_employee.employee_id)
     return
+
+
+@router.post("/upload-image")
+async def upload_country_image(
+    country_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Upload a country image to the S3 bucket.
+    
+    :param file: Image file to upload
+    :param country_id: ID of the country (used to create a folder path)
+    :return: S3 object URL
+    """
+    try:
+        # Define the folder path (e.g., 'countries/{country_id}/images/')
+        folder_path = f"countries/{country_id}/images"
+
+        # Save the file temporarily
+        temp_file_path = f"/tmp/{file.filename}"
+        with open(temp_file_path, "wb") as buffer:
+            buffer.write(await file.read())
+
+        # Upload the file to S3
+        object_url = aws_service.upload_file(temp_file_path, folder_path)
+
+        # Clean up the temporary file
+        os.remove(temp_file_path)
+
+        return JSONResponse(content={"message": "Country image uploaded successfully", "object_url": object_url})
+
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred: {str(e)}"
+        )
