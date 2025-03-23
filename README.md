@@ -48,6 +48,10 @@ This project is a FastAPI backend application built using SQLAlchemy for databas
     DATABASE_URL=postgresql://user:password@host/database_name
     JWT_SECRET_KEY=YOUR_VERY_STRONG_SECRET_KEY
     ACCESS_TOKEN_EXPIRE_MINUTES=30
+    AWS_ACCESS_KEY_ID=your-access-key-id
+    AWS_SECRET_ACCESS_KEY=your-secret-access-key
+    AWS_REGION_NAME=your-region
+    AWS_BUCKET_NAME=your-bucket-name
     ```
 
     Replace the placeholder values with your actual database credentials and secret key.
