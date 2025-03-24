@@ -71,7 +71,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from typing import Annotated, Union
 from ..helpers import auth_utils
-from ..database import get_db
+from ..config.database import get_db
 from .. import models
 from ..core import constants
 

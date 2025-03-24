@@ -1,7 +1,7 @@
 # app/models/role_permissions.py
 from sqlalchemy import Column, Integer, DateTime, ForeignKey, func
 from sqlalchemy.orm import relationship
-from ..database import Base
+from ..config.database import Base
 
 class RolePermissions(Base):
     __tablename__ = "role_permissions"

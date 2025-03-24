@@ -1,7 +1,7 @@
 # app/models/employee_visa_type_access.py
 from sqlalchemy import Column, Integer, DateTime, ForeignKey, func
 from sqlalchemy.orm import relationship
-from ..database import Base
+from ..config.database import Base
 
 class EmployeeVisaTypeAccess(Base):
     __tablename__ = "employee_visa_type_access"

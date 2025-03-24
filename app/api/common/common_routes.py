@@ -8,7 +8,7 @@ from app.api.common.common_service import get_employee_response, get_user_respon
 from app.api.employee import employee_service
 from app.api.user import user_service
 from app.helpers import auth_utils
-from ...database import get_db
+from ...config.database import get_db
 from ..dependencies import CurrentUser,CurrentEmployee
 from ...models import User, EmployeeHdr
 from app.api.common.common_types import  SignInRequest, Token, UserOrEmployeeResponse

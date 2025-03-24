@@ -1,7 +1,7 @@
 # app/models/employee_roles.py
 from sqlalchemy import Column, Integer, DateTime, ForeignKey, func
 from sqlalchemy.orm import relationship
-from ..database import Base
+from ..config.database import Base
 
 class EmployeeRole(Base):
     __tablename__ = "employee_role"

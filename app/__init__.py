@@ -1,2 +1,3 @@
 # app/__init__.py
-from . import models, api, helpers, database
+from .config import database
+from . import models, api, helpers

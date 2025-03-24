@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Union
 
-from ...database import get_db
+from ...config.database import get_db
 from . import visa_types, visa_service
 from ...api.dependencies import CurrentEmployee
 

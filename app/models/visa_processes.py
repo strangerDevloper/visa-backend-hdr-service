@@ -3,7 +3,7 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Numeric
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
-from app.database import Base
+from app.config.database import Base
 
 class VisaProcessHdr(Base):
     __tablename__ = "visa_process_hdr"

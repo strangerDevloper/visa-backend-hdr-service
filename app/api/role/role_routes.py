@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.api.common.common_types import PermissionResponse
 from app.api.dependencies import CurrentEmployee, CurrentUser
-from app.database import get_db
+from app.config.database import get_db
 from app.api.role.role_types import PermissionBase, RoleCreate, RoleResponse, RoleUpdate, RolePermissionsUpdate
 from app.api.role.role_service import (
     create_role,

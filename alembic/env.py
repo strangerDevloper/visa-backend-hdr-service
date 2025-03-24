@@ -11,7 +11,7 @@ from alembic import context
 load_dotenv(os.path.join(os.path.dirname(__file__), '../.env'))
 
 # Import your Base metadata
-from app.database import Base
+from app.config.database import Base
 from app.models import * #Import all of your models
 
 target_metadata = Base.metadata

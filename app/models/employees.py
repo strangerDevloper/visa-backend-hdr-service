@@ -1,7 +1,7 @@
 # app/models/employees.py
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, func, ForeignKey, Enum
 from sqlalchemy.orm import relationship
-from ..database import Base
+from ..config.database import Base
 import enum
 
 class Gender(enum.Enum):

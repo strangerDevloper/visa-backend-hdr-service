@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query  # Import Q
 from sqlalchemy.orm import Session
 
 from app.core.constants import USER_TYPE_USER
-from ...database import get_db
+from ...config.database import get_db
 from . import user_types, user_service
 from ...helpers import auth_utils
 from fastapi.security import OAuth2PasswordRequestForm

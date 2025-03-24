@@ -3,7 +3,7 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, DateTime, Enum
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
-from app.database import Base
+from app.config.database import Base
 
 class CountryServiceMedia(Base):
     __tablename__ = "country_service_media"

@@ -5,8 +5,8 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from typing import List, Dict, Union, Optional
 
-from app.aws import AWSService
-from ...database import get_db
+from app.config.aws import AWSService
+from ...config.database import get_db
 from . import country_types, country_service
 from ...api.dependencies import CurrentEmployee
 

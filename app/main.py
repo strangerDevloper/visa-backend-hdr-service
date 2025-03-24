@@ -3,7 +3,7 @@ from fastapi import FastAPI, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware  # Import CORSMiddleware
 from .api import users_router, employee_router, country_router, common_router, role_router, visa_router  # Import country routes 
-from .database import Base, engine
+from .config.database import Base, engine
 from dotenv import load_dotenv
 import uvicorn
 import argparse

@@ -2,7 +2,7 @@
 from sqlalchemy import Column, Integer, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from ..database import Base
+from ..config.database import Base
 
 class EmployeeCountryAccess(Base):
     __tablename__ = "employee_country_access"

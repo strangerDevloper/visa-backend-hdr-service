@@ -1,7 +1,7 @@
 # app/models/visa_rate_cuts.py
 from sqlalchemy import Column, Integer, DateTime, Boolean, ForeignKey, func
 from sqlalchemy.orm import relationship
-from ..database import Base
+from ..config.database import Base
 
 class VisaRateCut(Base):
     __tablename__ = "visa_rate_cut"

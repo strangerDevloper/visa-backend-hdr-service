@@ -2,7 +2,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, Enum, ForeignKey, Text, func
 from sqlalchemy.orm import relationship
 from enum import Enum as PyEnum
-from ..database import Base
+from ..config.database import Base
 
 class FieldTypeEnum(PyEnum):
     STRING = 'STRING'

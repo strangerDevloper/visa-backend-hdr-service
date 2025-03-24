@@ -1,7 +1,7 @@
 # app/models/countries.py
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, func, ForeignKey
 from sqlalchemy.orm import relationship
-from ..database import Base
+from ..config.database import Base
 
 class CountryHdr(Base):
     __tablename__ = "country_hdr"
