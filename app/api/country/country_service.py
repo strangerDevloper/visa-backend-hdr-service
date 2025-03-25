@@ -97,3 +97,31 @@ def add_country_media(db: Session, country_id: int, media: country_types.Country
     db.commit()
     db.refresh(db_media)
     return db_media
+
+def add_country_media(
+    db: Session,
+    country_id: int,
+    country_code: str,  # New parameter
+    file_name: str,
+    file_url: str,
+    file_type: str,
+    is_flag: bool,
+    is_icon: bool,
+    is_default: bool,
+    modified_by: int
+):
+    """Inserts country media with country_code based path"""
+    db_media = models.CountryServiceMedia(
+        country_id=country_id,
+        file_name=file_name,
+        file_path=file_url,
+        file_type=file_type,
+        is_flag=is_flag,
+        is_icon=is_icon,
+        is_default=is_default,
+        modified_by=modified_by
+    )
+    db.add(db_media)
+    db.commit()
+    db.refresh(db_media)
+    return db_media
