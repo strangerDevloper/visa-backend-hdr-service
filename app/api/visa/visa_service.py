@@ -168,3 +168,28 @@ def update_field(db: Session, field_id: int, field_update: visa_types.VisaFieldU
         db.refresh(db_field)
         return db_field
     return None
+
+def add_visa_media(
+    db: Session,
+    visa_process_id: int,
+    country_code: str,        # New parameter
+    visa_short_name: str,     # New parameter
+    file_name: str,
+    file_url: str,
+    file_type: str,
+    is_default: bool,
+    modified_by: int
+):
+    """Inserts visa media with structured path"""
+    db_media = models.CountryServiceMedia(
+        visa_process_id=visa_process_id,
+        file_name=file_name,
+        file_path=file_url,
+        file_type=file_type,
+        is_default=is_default,
+        modified_by=modified_by
+    )
+    db.add(db_media)
+    db.commit()
+    db.refresh(db_media)
+    return db_media
