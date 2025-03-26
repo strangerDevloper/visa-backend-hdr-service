@@ -1,19 +1,10 @@
 # app/models/employees.py
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, func, ForeignKey, Enum
 from sqlalchemy.orm import relationship
+
+from app.models.enums import Gender, MaritalStatus
 from ..config.database import Base
 import enum
-
-class Gender(enum.Enum):
-    MALE = "MALE"
-    FEMALE = "FEMALE"
-    OTHER = "OTHER"
-
-class MaritalStatus(enum.Enum):
-    SINGLE = "SINGLE"
-    MARRIED = "MARRIED"
-    DIVORCED = "DIVORCED"
-    WIDOWED = "WIDOWED"
 
 class IDProofType(enum.Enum):
     AADHAR = "AADHAR"
