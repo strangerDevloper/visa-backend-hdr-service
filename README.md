@@ -79,8 +79,10 @@ This project is a FastAPI backend application built using SQLAlchemy for databas
 BACKENDSERVICES/
 ├── app/
 │   ├── init.py               # Package initialization
-│   ├── database.py           # Database connection and session management
 │   ├── main.py               # FastAPI application entry point
+│   ├── config/               # Service Config
+│   │   ├── aws.py
+│   │   └── database.py       # Database connection and session management
 │   ├── models/               # SQLAlchemy models
 │   │   ├── init.py
 │   │   └── users.py          # User models
