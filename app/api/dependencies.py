@@ -75,7 +75,7 @@ from ..config.database import get_db
 from .. import models
 from ..core import constants
 
-# Single security scheme for both employees and users
+# Single security scheme for employees, users and vendors
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/signin", auto_error=False)
 
 def get_user_from_token(token: str):
@@ -116,8 +116,16 @@ def get_current_user(request: Request, token: str = Depends(oauth2_scheme), db: 
         if not db_employee:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found")
         return db_employee
+    elif user_type == constants.USER_TYPE_VENDOR:
+        db_vendor = db.query(models.Vendor).filter(models.Vendor.vendor_id == user_id).first()
+        if not db_vendor:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vendor not found")
+        if db_vendor.status != "APPROVED":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vendor account not approved")
+        return db_vendor
     else:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user type in token.")
 
-CurrentUser = Annotated[Union[models.EmployeeHdr, models.User], Depends(get_current_user)]
-CurrentEmployee = CurrentUser
+CurrentUser = Annotated[Union[models.EmployeeHdr, models.User, models.Vendor], Depends(get_current_user)]
+CurrentEmployee = Annotated[models.EmployeeHdr, Depends(get_current_user)]
+CurrentVendor = Annotated[models.Vendor, Depends(get_current_user)]

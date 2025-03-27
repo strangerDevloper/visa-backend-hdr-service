@@ -1,7 +1,7 @@
 # app/api/common/common_types.py
 
 from pydantic import BaseModel, Field
-from typing import List, Optional, Union
+from typing import List, Literal, Optional, Union
 
 from app.core.constants import USER_TYPE_EMPLOYEE, UserType
 
@@ -41,6 +41,15 @@ class UserResponse(BaseUserResponse):
 
     class Config:
         from_attributes = True  # Enable ORM mode for SQLAlchemy models
+
+
+class VendorResponse(BaseModel):
+    user_type: Literal["vendor"]
+    id: int
+    email: str
+    name: str
+    vendor_code: str
+    status: str
 
 
 # Employee response model

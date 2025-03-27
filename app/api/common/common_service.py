@@ -3,9 +3,10 @@
 from sqlalchemy.orm import Session, joinedload
 from fastapi import HTTPException
 from typing import List, Optional
-from app.api.common.common_types import EmployeeResponse, PermissionResponse, RoleResponse, UserResponse
+from app.api.common.common_types import EmployeeResponse, PermissionResponse, RoleResponse, UserResponse, VendorResponse
 from app.models import User, EmployeeHdr, EmployeeRole, RoleHdr, RolePermissions, Permissions
 from app.core.constants import USER_TYPE_EMPLOYEE, USER_TYPE_USER
+from app.models.vendor import Vendor
 
 def get_user_response(user: User) -> UserResponse:
     """
@@ -68,4 +69,15 @@ def get_employee_response(employee: EmployeeHdr, db: Session) -> EmployeeRespons
         username=employee.employee_code,
         email=employee.email,
         roles=roles,  # List of roles
+    )
+
+# Add this helper function
+def get_vendor_response(vendor: Vendor) -> VendorResponse:
+    return VendorResponse(
+        user_type="vendor",
+        id=vendor.vendor_id,
+        email=vendor.email,
+        name=f"{vendor.first_name} {vendor.last_name}".strip(),
+        vendor_code=vendor.vendor_code,
+        status= vendor.status if vendor.status else None
     )
