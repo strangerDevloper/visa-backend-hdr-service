@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.api.vendor.vendor_types import VendorProfileUpdate, VendorSignup
-from app.helpers import auth_utils
+from app.helpers import auth_utils, email_sender
 from ...models.vendor import Vendor
 import random
 import string
@@ -41,8 +41,8 @@ def approve_vendor(db: Session, vendor_id: int, approved_by: int):
     db.commit()
     db.refresh(vendor)
     
-    # In real app, you would send email here
-    print(f"Generated password for vendor {vendor.email}: {default_password}")
+    # Send approval email
+    email_sender.send_vendor_approval_email(vendor.email, default_password)
     
     return vendor
 
