@@ -8,6 +8,7 @@ import enum
 
 
 class VendorStatus(enum.Enum):
+    TEMPORARY = "TEMPORARY"  # New status
     PENDING = "PENDING"
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
@@ -32,6 +33,8 @@ class Vendor(Base):
     status = Column(Enum(VendorStatus), default=VendorStatus.PENDING)
     vendor_uid = Column(String, unique=True)
     password_hash = Column(String)
+    is_temporary: bool = Column(Boolean, default=False)
+    last_login = Column(DateTime, nullable=True)
     login_count = Column(Integer, default=0)
     approved_by = Column(Integer, ForeignKey('employee_hdr.employee_id'), nullable=True)
     approved_date = Column(DateTime, nullable=True)

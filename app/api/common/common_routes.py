@@ -4,13 +4,15 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
-from app.api.common.common_service import get_employee_response, get_user_response
+from app.api.common.common_service import get_employee_response, get_user_response, get_vendor_response
 from app.api.employee import employee_service
 from app.api.user import user_service
 from app.helpers import auth_utils
+from app.models.employees import EmployeeHdr
+from app.models.users import User
+from app.models.vendor import Vendor
 from ...config.database import get_db
 from ..dependencies import CurrentUser,CurrentEmployee
-from ...models import User, EmployeeHdr
 from app.api.common.common_types import  SignInRequest, Token, UserOrEmployeeResponse
 from app.core.constants import USER_TYPE_EMPLOYEE, USER_TYPE_USER, UserType
 
@@ -29,6 +31,8 @@ async def get_current_user_details(current_user: CurrentUser, db: Session = Depe
         return get_user_response(current_user)
     elif isinstance(current_user, EmployeeHdr):
         return get_employee_response(current_user, db)
+    elif isinstance(current_user, Vendor):
+        return get_vendor_response(current_user)
     else:
         raise HTTPException(status_code=400, detail="Invalid user type.")
     
