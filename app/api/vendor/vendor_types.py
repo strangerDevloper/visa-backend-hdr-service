@@ -1,7 +1,15 @@
 # app/api/vendor/vendor_types.py
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, EmailStr
+from enum import Enum
+
+class VendorStatus(str, Enum):
+    TEMPORARY = "TEMPORARY"  # New status
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    SUSPENDED = "SUSPENDED"
 
 class VendorBase(BaseModel):
     first_name: str
@@ -15,17 +23,44 @@ class VendorBase(BaseModel):
     pincode: str
     address: str
 
+
+# app/api/vendor/vendor_types.py
+class VendorTemporaryCreate(BaseModel):
+    """Initial signup without documents"""
+    first_name: str
+    middle_name: Optional[str] = None
+    last_name: str
+    email: EmailStr
+    contact_no: str
+    gender: str
+    dob: datetime
+    marital_status: str
+    pincode: str
+    address: str
+
+class VendorTemporaryResponse(BaseModel):
+    vendor_uid: str
+    vendor_code: str
+
+class VendorDocumentCreate(BaseModel):
+    document_type: str  # Will map to DocumentType enum
+    document_number: str
+    document_path: str  # Server-side file path
+
+
 class VendorCreate(VendorBase):
     pass
 
 class VendorSignup(VendorBase):
-    pass
+    documents: List[VendorDocumentCreate]  # Add documents to signup payload
 
-class VendorSignupResponse(BaseModel):
+class VendorSignupResponse(VendorSignup):
     vendor_id: int
-    email: EmailStr
     status: str
     message: str = "Vendor signup successful. Waiting for admin approval."
+    
+    class Config:
+        from_attributes = True
 
 class VendorApprove(BaseModel):
     vendor_id: int
