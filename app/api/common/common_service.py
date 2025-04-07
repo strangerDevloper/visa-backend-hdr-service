@@ -18,6 +18,8 @@ def get_user_response(user: User) -> UserResponse:
         name=user.name,
         username=user.username,
         email=user.email,
+        contact_number=user.contact_no,
+        address='',
     )
 
 def get_employee_response(employee: EmployeeHdr, db: Session) -> EmployeeResponse:
@@ -68,6 +70,8 @@ def get_employee_response(employee: EmployeeHdr, db: Session) -> EmployeeRespons
         name=f"{employee.first_name} {employee.last_name}",
         username=employee.employee_code,
         email=employee.email,
+        address=employee.address,
+        contact_number=employee.mobile_no,
         roles=roles,  # List of roles
     )
 
@@ -78,6 +82,9 @@ def get_vendor_response(vendor: Vendor) -> VendorResponse:
         id=vendor.vendor_id,
         email=vendor.email,
         name=f"{vendor.first_name} {vendor.last_name}".strip(),
+        contact_number=vendor.contact_no,
+        address=vendor.address,
         vendor_code=vendor.vendor_code,
+
         status= vendor.status if vendor.status else None
     )
