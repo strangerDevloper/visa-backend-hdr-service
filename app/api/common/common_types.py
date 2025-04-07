@@ -30,7 +30,7 @@ class RoleResponse(BaseModel):
 
 # Base response model
 class BaseUserResponse(BaseModel):
-    user_type: str = Field(..., description="Type of the user (USER or EMPLOYEE)")
+    user_type: str = Field(..., description="Type of the user (USER or EMPLOYEE or VENDOR)")
 
 # User-specific response model
 class UserResponse(BaseUserResponse):
@@ -38,17 +38,20 @@ class UserResponse(BaseUserResponse):
     name: str
     username: str
     email: str
+    contact_number: str
+    address: str
 
     class Config:
         from_attributes = True  # Enable ORM mode for SQLAlchemy models
 
 
-class VendorResponse(BaseModel):
-    user_type: Literal["vendor"]
-    id: int
+class VendorResponse(BaseUserResponse):
+    user_id: int
     email: str
     name: str
     vendor_code: str
+    contact_number: str
+    address: str
     status: str
 
 
@@ -58,6 +61,8 @@ class EmployeeResponse(BaseUserResponse):
     name: str
     username: str
     email: str
+    contact_number: str
+    address: str
     roles: List[RoleResponse]  # List of roles associated with the employee
 
     class Config:
