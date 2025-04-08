@@ -6,3 +6,4 @@ from .common import router as common_router #Add common router
 from .role import router as role_router #Add role router
 from .visa import router as visa_router #Add visa router
 from .vendor import router as vendor_router #Add vendor router
+from .coupon import router as coupon_router #Add coupon router

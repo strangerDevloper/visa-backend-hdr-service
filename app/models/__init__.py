@@ -15,3 +15,4 @@ from .country_service_media import CountryServiceMedia
 from .vendor import Vendor
 from .vendor_document import VendorDocument
 from .vendor_po import VendorPO
+from .coupon import Coupon
