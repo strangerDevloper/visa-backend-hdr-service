@@ -9,7 +9,7 @@ from ...helpers import auth_utils
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from ...api.dependencies import CurrentEmployee
 from ... import models
-from typing import List, Dict, Union
+from typing import List, Dict, Optional, Union
 
 
 router = APIRouter(prefix="/employees", tags=["employees"])
@@ -27,10 +27,24 @@ def read_employee(employee_id: int, current_employee: CurrentEmployee, db: Sessi
     return db_employee
 
 @router.get("/", response_model=Dict[str, Union[List[employee_types.Employee], int]])
-def read_employees(current_employee: CurrentEmployee, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    employees, total_count = employee_service.get_employees(db, skip=skip, limit=limit)
+def read_employees(
+    current_employee: CurrentEmployee,
+    skip: int = 0,
+    limit: int = 100,
+    country_id: Optional[int] = None,
+    visa_process_id: Optional[int] = None,
+    role_id: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    employees, total_count = employee_service.get_employees(
+        db,
+        skip=skip,
+        limit=limit,
+        country_id=country_id,
+        visa_process_id=visa_process_id,
+        role_id=role_id
+    )
     return {"employees": employees, "total_count": total_count}
-
 
 @router.put("/{employee_id}", response_model=employee_types.Employee)
 def update_employee(employee_id: int, employee_update: employee_types.EmployeeUpdate, current_employee: CurrentEmployee, db: Session = Depends(get_db)):

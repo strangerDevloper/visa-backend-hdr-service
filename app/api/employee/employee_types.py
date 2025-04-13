@@ -70,6 +70,34 @@ class EmployeeUpdate(BaseModel):
                 raise ValueError("ID proof type must be one of: AADHAR, PAN, VOTER_ID, DRIVING_LICENSE, PASSPORT, OTHER")
         return value
 
+class EmployeeRoleResponse(BaseModel):
+    role_id: int
+    role_name: str
+
+    class Config:
+        from_attributes = True
+
+class EmployeeCountryAccessResponse(BaseModel):
+    country_id: int
+    country_name: str
+
+    class Config:
+        from_attributes = True
+
+# class Employee(EmployeeBase):
+#     employee_id: int
+#     emp_uid: str
+#     active_status: bool = True
+#     is_absent: bool = False
+#     absence_expiry: Optional[datetime] = None
+#     created_by: Optional[int] = None
+#     created_date: datetime
+#     modified_by: Optional[int] = None
+#     modified_date: Optional[datetime] = None
+#     password: Optional[str] = None  # Added password to return default password on creation.
+
+#     class Config:
+#         from_attributes = True  # Enable ORM mode for SQLAlchemy models
 
 class Employee(EmployeeBase):
     employee_id: int
@@ -81,10 +109,12 @@ class Employee(EmployeeBase):
     created_date: datetime
     modified_by: Optional[int] = None
     modified_date: Optional[datetime] = None
-    password: Optional[str] = None  # Added password to return default password on creation.
+    password: Optional[str] = None
+    roles: List[EmployeeRoleResponse] = []  # List of roles
+    country_access: List[EmployeeCountryAccessResponse] = []  # List of country access
 
     class Config:
-        from_attributes = True  # Enable ORM mode for SQLAlchemy models
+        from_attributes = True
 
 class Token(BaseModel):
     access_token: str

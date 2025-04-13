@@ -6,7 +6,7 @@ from . import employee_types
 from ...helpers import auth_utils
 import uuid
 from datetime import datetime
-from typing import Tuple, List
+from typing import Optional, Tuple, List
 from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException, status
 
@@ -50,17 +50,59 @@ def create_employee(db: Session, employee: employee_types.EmployeeCreate, create
             detail=str(e),
         )
 
+# def get_employee(db: Session, employee_id: int):
+#     """
+#     Get an employee by ID.
+#     """
+#     db_employee = db.query(models.EmployeeHdr).filter(models.EmployeeHdr.employee_id == employee_id).first()
+#     if db_employee is None:
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             detail=f"Employee with ID {employee_id} not found.",
+#         )
+#     return db_employee
+
 def get_employee(db: Session, employee_id: int):
     """
-    Get an employee by ID.
+    Get an employee by ID with their roles and country access information.
     """
+    # Get the employee
     db_employee = db.query(models.EmployeeHdr).filter(models.EmployeeHdr.employee_id == employee_id).first()
     if db_employee is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Employee with ID {employee_id} not found.",
         )
-    return db_employee
+    
+    # Get employee roles with role names
+    roles = (
+        db.query(
+            models.EmployeeRole.role_id,
+            models.RoleHdr.role_name
+        )
+        .join(models.RoleHdr, models.EmployeeRole.role_id == models.RoleHdr.role_id)
+        .filter(models.EmployeeRole.employee_id == employee_id)
+        .all()
+    )
+    
+    # Get employee country access with country names
+    country_access = (
+        db.query(
+            models.EmployeeVisaTypeAccess.country_id,
+            models.CountryHdr.country_name
+        )
+        .join(models.CountryHdr, models.EmployeeVisaTypeAccess.country_id == models.CountryHdr.country_id)
+        .filter(models.EmployeeVisaTypeAccess.employee_id == employee_id)
+        .distinct()  # In case there are multiple entries for the same country
+        .all()
+    )
+    
+    # Convert the employee to dict and add the additional data
+    employee_data = db_employee.__dict__
+    employee_data['roles'] = [{'role_id': r.role_id, 'role_name': r.role_name} for r in roles]
+    employee_data['country_access'] = [{'country_id': c.country_id, 'country_name': c.country_name} for c in country_access]
+    
+    return employee_data
 
 def get_employee_by_uid(db: Session, emp_uid: str):
     """
@@ -86,11 +128,62 @@ def get_employee_by_email(db: Session, email: str):
         )
     return db_employee
 
-def get_employees(db: Session, skip: int = 0, limit: int = 100) -> Tuple[List[models.EmployeeHdr], int]:
+def get_employees(
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    country_id: Optional[int] = None,
+    visa_process_id: Optional[int] = None,
+    role_id: Optional[int] = None
+) -> Tuple[List[models.EmployeeHdr], int]:
     """
-    Get a list of employees with pagination.
+    Get a list of employees with pagination and optional filtering by:
+    - visa access (country_id and/or visa_process_id)
+    - role assignment (role_id)
     """
     query = db.query(models.EmployeeHdr).filter(models.EmployeeHdr.active_status == True)
+    
+    # We'll collect all subqueries for different filters
+    subqueries = []
+    
+    # Filter by visa access if provided
+    if country_id is not None or visa_process_id is not None:
+        access_query = db.query(models.EmployeeVisaTypeAccess.employee_id)
+        
+        if country_id is not None:
+            access_query = access_query.filter(
+                models.EmployeeVisaTypeAccess.country_id == country_id
+            )
+        
+        if visa_process_id is not None:
+            access_query = access_query.filter(
+                models.EmployeeVisaTypeAccess.visa_process_id == visa_process_id
+            )
+        
+        subqueries.append(access_query.distinct())
+    
+    # Filter by role if provided
+    if role_id is not None:
+        role_query = db.query(models.EmployeeRole.employee_id).filter(
+            models.EmployeeRole.role_id == role_id
+        )
+        subqueries.append(role_query.distinct())
+    
+    # Apply all filters if any exist
+    if subqueries:
+        # Start with the first subquery
+        combined_query = subqueries[0]
+        
+        # Intersect with additional subqueries (AND condition)
+        for subq in subqueries[1:]:
+            combined_query = combined_query.intersect(subq)
+        
+        employee_ids = combined_query.subquery()
+        query = query.join(
+            employee_ids,
+            models.EmployeeHdr.employee_id == employee_ids.c.employee_id
+        )
+    
     total_count = query.count()
     employees = query.offset(skip).limit(limit).all()
     return employees, total_count
