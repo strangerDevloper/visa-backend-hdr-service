@@ -8,6 +8,16 @@ class CountryMediaCreate(BaseModel):
     is_flag: bool = False  # Whether the file is a country flag
     is_icon: bool = False  # Whether the file is a country icon
 
+class CountryMediaResponse(BaseModel):
+    """Payload for adding a media file to a country."""
+    image_id: int  # Unique identifier for the media file
+    file_path: str  # S3 file path
+    is_flag: bool = False  # Whether the file is a country flag
+    is_icon: bool = False  # Whether the file is a country icon
+    presigned_url: str  # New field for the URL
+    expires_in: str  # New field for the expiration time of the presigned URL
+
+
 class CountryBase(BaseModel):
     country_name: str
     country_code: str
@@ -18,7 +28,8 @@ class CountryBase(BaseModel):
 
 class CountryCreate(CountryBase):
     """Payload for creating a country."""
-    media_files: Optional[List[CountryMediaCreate]] = None  # Optional media files
+    # media_files: Optional[List[CountryMediaCreate]] = None  # Optional media files
+    pass
 
 class CountryUpdate(BaseModel):
     """Payload for updating a country. All fields are optional."""
@@ -29,7 +40,7 @@ class CountryUpdate(BaseModel):
     description: Optional[str] = None
     logo_path: Optional[str] = None
     is_active: Optional[bool] = None
-    media_files: Optional[List[CountryMediaCreate]] = None  # Optional media files
+    # media_files: Optional[List[CountryMediaCreate]] = None  # Optional media files
 
 class Country(CountryBase):
     """Response model for a country."""
@@ -42,4 +53,4 @@ class Country(CountryBase):
 class CountryWithMedia(BaseModel):
     """Response model for a country with media files."""
     country: Country
-    media_files: List[CountryMediaCreate]  # List of media files
+    media_files: List[CountryMediaResponse]  # List of media files

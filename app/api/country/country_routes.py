@@ -44,10 +44,10 @@ def create_country(
     # Create the country
     db_country = country_service.create_country(db, country, current_employee.employee_id)
 
-    # Handle media files (if any)
-    if country.media_files:
-        for media in country.media_files:
-            country_service.add_country_media(db, db_country.country_id, media, current_employee.employee_id)
+    # # Handle media files (if any)
+    # if country.media_files:
+    #     for media in country.media_files:
+    #         country_service.add_country_media(db, db_country.country_id, media, current_employee.employee_id)
 
     return db_country
 
@@ -64,7 +64,19 @@ def get_country(
 
     # Fetch media files for the country
     media_files = country_service.get_country_media(db, country_id)
-    return {"country": db_country, "media_files": media_files}
+
+    media_files_with_presigned_urls = []
+    for media in media_files:
+        media_files_with_presigned_urls.append({
+            "image_id": media.image_id,
+            "presigned_url": aws_service.generate_presigned_url(media.file_path),
+            "file_path" : media.file_path,
+            "is_flag": media.is_flag,
+            "is_icon": media.is_icon,
+            "expires_in": "3600 seconds"
+        })
+
+    return {"country": db_country, "media_files": media_files_with_presigned_urls}
 
 @router.get("/", response_model=Dict[str, Union[List[country_types.Country], int]])
 def get_countries(
@@ -96,10 +108,10 @@ def update_country(
     # Update country details
     updated_country = country_service.update_country(db, country_id, country_update, current_employee.employee_id)
 
-    # Handle media files (if any)
-    if country_update.media_files:
-        for media in country_update.media_files:
-            country_service.add_country_media(db, country_id, media, current_employee.employee_id)
+    # # Handle media files (if any)
+    # if country_update.media_files:
+    #     for media in country_update.media_files:
+    #         country_service.add_country_media(db, country_id, media, current_employee.employee_id)
 
     return updated_country
 
@@ -154,8 +166,7 @@ async def upload_country_media(
                 file_type="IMAGE" if file.content_type.startswith("image") else "VIDEO",
                 is_flag=is_flag,
                 is_icon=is_icon,
-                is_default=is_default,
-                modified_by=current_employee.employee_id
+                is_default=is_default
             )
             db.add(media)
             results.append({"media_id": media.image_id, "s3_key": s3_key})
@@ -168,20 +179,16 @@ async def upload_country_media(
         raise HTTPException(500, detail=str(e))
     
 
-@router.get("/media")
+@router.get("/media/{country_id}")  # Changed to path parameter
 def get_media_with_presigned_urls(
+    country_id: int,  # Now a required path parameter
     current_employee: CurrentEmployee,
-    country_id: Optional[int] = None,
     db: Session = Depends(get_db)
 ):
-    if not country_id:
-        raise HTTPException(400, "country_id must be provided")
-
-    query = db.query(models.CountryServiceMedia)
+    query = db.query(models.CountryServiceMedia).filter(
+        models.CountryServiceMedia.country_id == country_id
+    )
     
-    if country_id:
-        query = query.filter(models.CountryServiceMedia.country_id == country_id)
-
     media_items = query.all()
     
     results = []
