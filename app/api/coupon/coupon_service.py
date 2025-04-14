@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from datetime import datetime
 from app.models.coupon import Coupon
-from app.api.coupon.coupon_types import CouponCreate, CouponUpdate
+from app.api.coupon.coupon_types import CouponCreate, CouponResponse, CouponUpdate
 
 def create_coupon(db: Session, coupon: CouponCreate):
     db_coupon = Coupon(
@@ -54,51 +54,142 @@ def deactivate_coupon(db: Session, coupon_id: int):
     return True
 
 def validate_coupon(db: Session, coupon_code: str, purchase_amount: float):
+    # Initialize response with all required fields
+    base_response = {
+        "valid": False,
+        "message": "",
+        "discount_amount": None,
+        "final_amount": None,
+        "coupon": None
+    }
+    
     coupon = get_coupon_by_code(db, coupon_code)
     if not coupon:
-        return {"valid": False, "message": "Coupon not found"}
+        base_response["message"] = "Coupon not found"
+        return base_response
     
     now = datetime.utcnow()
     if now < coupon.start_date:
-        return {"valid": False, "message": "Coupon not yet valid"}
+        base_response["message"] = "Coupon not yet valid"
+        return base_response
     
     if now > coupon.expire_date:
-        return {"valid": False, "message": "Coupon has expired"}
+        base_response["message"] = "Coupon has expired"
+        return base_response
     
     if not coupon.is_active:
-        return {"valid": False, "message": "Coupon is inactive"}
+        base_response["message"] = "Coupon is inactive"
+        return base_response
     
     if coupon.current_uses >= coupon.max_uses:
-        return {"valid": False, "message": "Coupon usage limit reached"}
+        base_response["message"] = "Coupon usage limit reached"
+        return base_response
     
-    if purchase_amount < coupon.min_purchase_amount:
-        return {
-            "valid": False,
-            "message": f"Minimum purchase amount {coupon.min_purchase_amount} required"
-        }
+    min_purchase = float(coupon.min_purchase_amount)
+    if purchase_amount < min_purchase:
+        base_response["message"] = f"Minimum purchase amount {min_purchase} required"
+        return base_response
     
-    # Calculate discount
+    # Calculate discount for valid coupons
+    discount_value = float(coupon.discount_value)
     if coupon.discount_type == "FLAT":
-        discount = min(coupon.discount_value, purchase_amount)
+        discount = min(discount_value, purchase_amount)
     else:  # PERCENTAGE
-        discount = purchase_amount * (coupon.discount_value / 100)
+        discount = purchase_amount * (discount_value / 100.0)
     
     return {
         "valid": True,
+        "message": "Coupon is valid",
         "discount_amount": discount,
         "final_amount": purchase_amount - discount,
         "coupon": coupon
     }
 
+
+# def apply_coupon(db: Session, coupon_code: str, purchase_amount: float):
+#     validation = validate_coupon(db, coupon_code, purchase_amount)
+#     if not validation["valid"]:
+#         return validation
+    
+#     coupon = validation["coupon"]
+#     coupon.current_uses += 1
+    
+#     try:
+#         db.commit()
+#         db.refresh(coupon)
+#     except Exception as e:
+#         db.rollback()
+#         return {
+#             "valid": False,
+#             "message": f"Failed to apply coupon: {str(e)}",
+#             "discount_amount": None,
+#             "final_amount": None,
+#             "coupon": None
+#         }
+    
+#     # Convert SQLAlchemy model to Pydantic model
+#     coupon_response = CouponResponse.model_validate(coupon)
+    
+#     return {
+#         "valid": True,
+#         "message": "Coupon applied successfully",
+#         "discount_amount": validation["discount_amount"],
+#         "final_amount": validation["final_amount"],
+#         "coupon": coupon_response
+#     }
+
+# In coupon_service.py
 def apply_coupon(db: Session, coupon_code: str, purchase_amount: float):
+    # First validate the coupon
     validation = validate_coupon(db, coupon_code, purchase_amount)
     if not validation["valid"]:
-        return validation
+        return {
+            "valid": False,
+            "message": validation["message"],
+            "discount_amount": None,
+            "final_amount": None,
+            "coupon": None
+        }
     
     coupon = validation["coupon"]
-    coupon.current_uses += 1
-    db.commit()
-    db.refresh(coupon)
     
-    validation["message"] = "Coupon applied successfully"
-    return validation
+    try:
+        # Increment usage count
+        coupon.current_uses += 1
+        db.commit()
+        db.refresh(coupon)
+        
+        # Convert SQLAlchemy model to dict for proper serialization
+        coupon_data = {
+            "coupon_id": coupon.coupon_id,
+            "coupon_code": coupon.coupon_code,
+            "discount_type": coupon.discount_type,
+            "discount_value": float(coupon.discount_value),
+            "start_date": coupon.start_date,
+            "expire_date": coupon.expire_date,
+            "max_uses": coupon.max_uses,
+            "current_uses": coupon.current_uses,
+            "min_purchase_amount": float(coupon.min_purchase_amount),
+            "is_active": coupon.is_active,
+            "created_at": coupon.created_at,
+            "created_by": coupon.created_by,
+            "description": coupon.description
+        }
+        
+        return {
+            "valid": True,
+            "message": "Coupon applied successfully",
+            "discount_amount": validation["discount_amount"],
+            "final_amount": validation["final_amount"],
+            "coupon": coupon_data
+        }
+        
+    except Exception as e:
+        db.rollback()
+        return {
+            "valid": False,
+            "message": f"Failed to apply coupon: {str(e)}",
+            "discount_amount": None,
+            "final_amount": None,
+            "coupon": None
+        }

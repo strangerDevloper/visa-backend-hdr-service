@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -63,7 +63,8 @@ def update_coupon(
         raise HTTPException(status_code=404, detail="Coupon not found")
     return db_coupon
 
-@router.delete("/{coupon_id}", status_code=204)
+
+@router.delete("/{coupon_id}", status_code=status.HTTP_200_OK)
 def delete_coupon(
     coupon_id: int,
     current_employee: CurrentEmployee,
@@ -72,10 +73,21 @@ def delete_coupon(
     """
     Deactivate a coupon
     - Requires admin privileges
+    Returns:
+        - 200 OK with success message when successful
+        - 404 Not Found when coupon doesn't exist
     """
     if not coupon_service.deactivate_coupon(db, coupon_id=coupon_id):
-        raise HTTPException(status_code=404, detail="Coupon not found")
-    return {"ok": True}
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Coupon not found"
+        )
+    return {
+        "status": "success",
+        "message": "Coupon deactivated successfully",
+        "coupon_id": coupon_id
+    }
+
 
 @router.post("/validate", response_model=coupon_types.CouponApplyResponse)
 def validate_coupon(
@@ -84,8 +96,24 @@ def validate_coupon(
 ):
     """
     Validate and calculate coupon discount
+    Returns:
+        - 200 OK with discount details for valid coupons
+        - 400 Bad Request with error message for invalid coupons
     """
-    return coupon_service.validate_coupon(db, request.coupon_code, request.purchase_amount)
+    result = coupon_service.validate_coupon(db, request.coupon_code, request.purchase_amount)
+    
+    if not result["valid"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": result["message"],
+                "valid": False,
+                "discount_amount": None,
+                "final_amount": None
+            }
+        )
+    
+    return result
 
 @router.post("/apply", response_model=coupon_types.CouponApplyResponse)
 def apply_coupon(
@@ -94,5 +122,22 @@ def apply_coupon(
 ):
     """
     Apply coupon and increment usage count
+    Returns:
+        - 200 OK with discount details when successful
+        - 400 Bad Request when coupon is invalid
     """
-    return coupon_service.apply_coupon(db, request.coupon_code, request.purchase_amount)
+    result = coupon_service.apply_coupon(db, request.coupon_code, request.purchase_amount)
+    
+    if not result["valid"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": result["message"],
+                "valid": False,
+                "discount_amount": None,
+                "final_amount": None,
+                "coupon": None
+            }
+        )
+    
+    return result

@@ -1,6 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel, Field, validator
-from typing import Optional
+from typing import Any, Optional
 from enum import Enum
 
 class CouponTypeEnum(str, Enum):
@@ -23,6 +23,27 @@ class CouponBase(BaseModel):
         if 'start_date' in values and v <= values['start_date']:
             raise ValueError("Expire date must be after start date")
         return v
+
+    class Config:
+        from_attributes = True
+
+class CouponResponse(BaseModel):
+    coupon_id: int
+    coupon_code: str
+    discount_type: str
+    discount_value: float
+    start_date: datetime
+    expire_date: datetime
+    max_uses: int
+    current_uses: int
+    min_purchase_amount: float
+    is_active: bool
+    created_at: Optional[datetime] = None
+    created_by: Optional[int] = None
+    description: Optional[str] = None
+
+    class Config:
+        from_attributes = True
 
 class CouponCreate(CouponBase):
     created_by: int  # User ID from auth token
@@ -47,6 +68,7 @@ class CouponApplyRequest(BaseModel):
 
 class CouponApplyResponse(BaseModel):
     valid: bool
-    discount_amount: float
-    final_amount: float
-    message: Optional[str] = None
+    message: str
+    discount_amount: Optional[float] = None
+    final_amount: Optional[float] = None
+    coupon: Optional[CouponResponse] = None  # Use the Pydantic model here
