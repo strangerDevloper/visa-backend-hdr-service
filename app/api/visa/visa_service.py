@@ -1,4 +1,7 @@
 # app/api/visa/visa_service.py
+from fastapi import HTTPException, status
+from psycopg2 import IntegrityError
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from ... import models
 from . import visa_types
@@ -6,67 +9,109 @@ from typing import List, Optional
 from datetime import datetime
 
 def create_visa_process(db: Session, visa_process: visa_types.VisaProcessCreate, created_by: int):
-    """Creates a new visa process."""
-    db_visa_process = models.VisaProcessHdr(
-        process_name=visa_process.process_name,
-        visa_code=visa_process.visa_code,
-        country_fee=visa_process.country_fee,
-        visa_description=visa_process.visa_description,
-        vendor_commission=visa_process.vendor_commission,
-        country_id=visa_process.country_id,
-        created_by=created_by,
-    )
-    db.add(db_visa_process)
-    db.commit()
-    db.refresh(db_visa_process)
+    """Creates a new visa process with proper validation."""
+    try:
+        # Check for duplicate visa_code before creating
+        existing_visa = db.query(models.VisaProcessHdr).filter(
+            func.lower(models.VisaProcessHdr.visa_code) == func.lower(visa_process.visa_code)
+        ).first()
+        
+        if existing_visa:
+            raise ValueError(f"Visa code '{visa_process.visa_code}' already exists")
 
-    # Add fields (if any)
-    if visa_process.fields:
-        for field in visa_process.fields:
-            db_field = models.VisaField(
-                visa_process_id=db_visa_process.visa_process_id,
-                binding_key=field.binding_key,
-                field_name=field.field_name,
-                field_type=field.field_type,
-                validation_type=field.validation_type,
-                validation_rule=field.validation_rule,
-                error_message=field.error_message,
+        # Start transaction
+        db_visa_process = models.VisaProcessHdr(
+            process_name=visa_process.process_name,
+            visa_code=visa_process.visa_code,
+            country_fee=visa_process.country_fee,
+            visa_description=visa_process.visa_description,
+            vendor_commission=visa_process.vendor_commission,
+            country_id=visa_process.country_id,
+            created_by=created_by,
+        )
+        db.add(db_visa_process)
+        db.commit()
+        db.refresh(db_visa_process)
+
+        # Add fields if any
+        if visa_process.fields:
+            for field in visa_process.fields:
+                db_field = models.VisaField(
+                    visa_process_id=db_visa_process.visa_process_id,
+                    binding_key=field.binding_key,
+                    field_name=field.field_name,
+                    field_type=field.field_type.value,
+                    validation_type=field.validation_type.value if field.validation_type else None,
+                    validation_rule=field.validation_rule,
+                    error_message=field.error_message,
+                )
+                db.add(db_field)
+
+        # Add rate cuts if any
+        if visa_process.rate_cuts:
+            for rate_cut in visa_process.rate_cuts:
+                db_rate_cut = models.VisaRateCut(
+                    visa_process_id=db_visa_process.visa_process_id,
+                    government_fee=rate_cut.government_fee,
+                    service_fee=rate_cut.service_fee,
+                    tax=rate_cut.tax,
+                    start_date=rate_cut.start_date,
+                    end_date=rate_cut.end_date,
+                    is_default=rate_cut.is_default,
+                    created_by=created_by,
+                )
+                db.add(db_rate_cut)
+
+        db.commit()
+        return db_visa_process
+
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except IntegrityError as e:
+        db.rollback()
+        if "visa_process_hdr_visa_code_key" in str(e):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Visa code '{visa_process.visa_code}' already exists"
             )
-            db.add(db_field)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Database integrity error occurred"
+        )
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred: {str(e)}"
+        )
 
-    # Add rate cuts (if any)
-    if visa_process.rate_cuts:
-        for rate_cut in visa_process.rate_cuts:
-            db_rate_cut = models.VisaRateCut(
-                visa_process_id=db_visa_process.visa_process_id,
-                government_fee=rate_cut.government_fee,
-                service_fee=rate_cut.service_fee,
-                tax=rate_cut.tax,
-                start_date=rate_cut.start_date,
-                end_date=rate_cut.end_date,
-                is_default=rate_cut.is_default,
-                created_by=created_by,
-            )
-            db.add(db_rate_cut)
-
-    # Add media files (if any)
-    if visa_process.media_files:
-        for media in visa_process.media_files:
-            db_media = models.CountryServiceMedia(
-                visa_process_id=db_visa_process.visa_process_id,
-                file_path=media.file_path,
-                file_type=media.file_type,
-                is_default=media.is_default,
-                uploaded_at=datetime.now(),
-            )
-            db.add(db_media)
-
-    db.commit()
-    return db_visa_process
 
 def get_visa_process(db: Session, visa_process_id: int):
     """Retrieves a visa process by its ID."""
     return db.query(models.VisaProcessHdr).filter(models.VisaProcessHdr.visa_process_id == visa_process_id).first()
+
+def get_visa_fields(db: Session, visa_process_id: int):
+    """Retrieves all fields for a visa process"""
+    return db.query(models.VisaField).filter(
+        models.VisaField.visa_process_id == visa_process_id
+    ).all()
+
+def get_default_rate_cut(db: Session, visa_process_id: int):
+    """Retrieves the default rate cut for a visa process"""
+    return db.query(models.VisaRateCut).filter(
+        models.VisaRateCut.visa_process_id == visa_process_id,
+        models.VisaRateCut.is_default == True
+    ).first()
+
+def get_visa_media(db: Session, visa_process_id: int):
+    """Retrieves all media files for a visa process"""
+    return db.query(models.CountryServiceMedia).filter(
+        models.CountryServiceMedia.visa_process_id == visa_process_id
+    ).all()
 
 def get_all_visa_processes(
     db: Session,

@@ -26,17 +26,50 @@ def create_visa_process(
     """Creates a new visa process."""
     return visa_service.create_visa_process(db, visa_process, current_employee.employee_id)
 
-@router.get("/{visa_process_id}", response_model=visa_types.VisaProcess)
+@router.get("/{visa_process_id}", response_model=visa_types.VisaProcessWithDetails)
 def get_visa_process(
     visa_process_id: int,
     current_employee: CurrentEmployee,
     db: Session = Depends(get_db),
 ):
-    """Retrieves a visa process by its ID."""
+    """
+    Retrieves a visa process by its ID with:
+    - Basic visa process info
+    - Default rate cut
+    - All visa fields
+    - Associated media files with presigned URLs
+    """
+    # Get visa process
     db_visa_process = visa_service.get_visa_process(db, visa_process_id)
     if not db_visa_process:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Visa process not found")
-    return db_visa_process
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Visa process not found"
+        )
+
+    # Get related data
+    default_rate_cut = visa_service.get_default_rate_cut(db, visa_process_id)
+    visa_fields = visa_service.get_visa_fields(db, visa_process_id)
+    media_files = visa_service.get_visa_media(db, visa_process_id)
+
+    # Prepare media files with presigned URLs
+    media_files_with_urls = []
+    for media in media_files:
+        media_files_with_urls.append({
+            "image_id": media.image_id,
+            "presigned_url": aws_service.generate_presigned_url(media.file_path),
+            "file_path": media.file_path,
+            "file_type": media.file_type,
+            "is_default": media.is_default,
+            "expires_in": "3600 seconds"
+        })
+
+    return {
+        "visa_process": db_visa_process,
+        "default_rate_cut": default_rate_cut,
+        "visa_fields": visa_fields,
+        "media_files": media_files_with_urls
+    }
 
 @router.get("/", response_model=Dict[str, Union[List[visa_types.VisaProcess], int]])
 def get_all_visa_processes(
@@ -164,8 +197,7 @@ async def upload_visa_media(
                 file_name=file.filename,  # Store original filename
                 file_path=s3_key,        # Store only S3 key
                 file_type="IMAGE" if file.content_type.startswith("image") else "VIDEO",
-                is_default=is_default,
-                modified_by=current_employee.employee_id
+                is_default=is_default
             )
             db.add(media)
             results.append({
@@ -185,10 +217,10 @@ async def upload_visa_media(
         db.rollback()
         raise HTTPException(500, detail=str(e))
     
-@router.get("/media")
+@router.get("/media/{visa_process_id}")
 def get_media_with_presigned_urls(
+    visa_process_id: int ,
     current_employee: CurrentEmployee,
-    visa_process_id: Optional[int] = None,
     db: Session = Depends(get_db)
 ):
     if not visa_process_id:
