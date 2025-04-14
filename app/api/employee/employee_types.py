@@ -3,7 +3,48 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import List, Optional
 from pydantic import validator
+from enum import Enum
 
+# Define enums for the constrained values
+class GenderEnum(str, Enum):
+    MALE = "MALE"
+    FEMALE = "FEMALE"
+    OTHER = "OTHER"
+
+class MaritalStatusEnum(str, Enum):
+    SINGLE = "SINGLE"
+    MARRIED = "MARRIED"
+    DIVORCED = "DIVORCED"
+    WIDOWED = "WIDOWED"
+
+class IdProofTypeEnum(str, Enum):
+    AADHAR = "AADHAR"
+    PAN = "PAN"
+    VOTER_ID = "VOTER_ID"
+    DRIVING_LICENSE = "DRIVING_LICENSE"
+    PASSPORT = "PASSPORT"
+    OTHER = "OTHER"
+
+def validate_gender(cls, value):
+    if value is not None:
+        value = value.upper()
+        if value not in [gender.value for gender in GenderEnum]:
+            raise ValueError(f"Gender must be one of: {', '.join([gender.value for gender in GenderEnum])}")
+    return value
+
+def validate_marital_status(cls, value):
+    if value is not None:
+        value = value.upper()
+        if value not in [status.value for status in MaritalStatusEnum]:
+            raise ValueError(f"Marital status must be one of: {', '.join([status.value for status in MaritalStatusEnum])}")
+    return value
+
+def validate_id_proof_type(cls, value):
+    if value is not None:
+        value = value.upper()
+        if value not in [proof.value for proof in IdProofTypeEnum]:
+            raise ValueError(f"ID proof type must be one of: {', '.join([proof.value for proof in IdProofTypeEnum])}")
+    return value
 
 class EmployeeBase(BaseModel):
     employee_title: Optional[str] = None
@@ -21,6 +62,11 @@ class EmployeeBase(BaseModel):
     email: str
     mobile_no: str
     employee_code: str
+
+    # Assign the validator functions
+    _validate_gender = validator("gender", allow_reuse=True)(validate_gender)
+    _validate_marital_status = validator("marital_status", allow_reuse=True)(validate_marital_status)
+    _validate_id_proof_type = validator("id_proof_type", allow_reuse=True)(validate_id_proof_type)
 
 class EmployeeCreate(EmployeeBase):
     pass
@@ -46,29 +92,10 @@ class EmployeeUpdate(BaseModel):
     absence_expiry: Optional[datetime] = None
     password: Optional[str] = None
 
-    @validator("gender")
-    def validate_gender(cls, value):
-        if value is not None:
-            value = value.upper()
-            if value not in ["MALE", "FEMALE", "OTHER"]:
-                raise ValueError("Gender must be one of: MALE, FEMALE, OTHER")
-        return value
-
-    @validator("marital_status")
-    def validate_marital_status(cls, value):
-        if value is not None:
-            value = value.upper()
-            if value not in ["SINGLE", "MARRIED", "DIVORCED", "WIDOWED"]:
-                raise ValueError("Marital status must be one of: SINGLE, MARRIED, DIVORCED, WIDOWED")
-        return value
-
-    @validator("id_proof_type")
-    def validate_id_proof_type(cls, value):
-        if value is not None:
-            value = value.upper()
-            if value not in ["AADHAR", "PAN", "VOTER_ID", "DRIVING_LICENSE", "PASSPORT", "OTHER"]:
-                raise ValueError("ID proof type must be one of: AADHAR, PAN, VOTER_ID, DRIVING_LICENSE, PASSPORT, OTHER")
-        return value
+    # Reuse the same validator functions
+    _validate_gender = validator("gender", allow_reuse=True)(validate_gender)
+    _validate_marital_status = validator("marital_status", allow_reuse=True)(validate_marital_status)
+    _validate_id_proof_type = validator("id_proof_type", allow_reuse=True)(validate_id_proof_type)
 
 class EmployeeRoleResponse(BaseModel):
     role_id: int
@@ -84,20 +111,6 @@ class EmployeeCountryAccessResponse(BaseModel):
     class Config:
         from_attributes = True
 
-# class Employee(EmployeeBase):
-#     employee_id: int
-#     emp_uid: str
-#     active_status: bool = True
-#     is_absent: bool = False
-#     absence_expiry: Optional[datetime] = None
-#     created_by: Optional[int] = None
-#     created_date: datetime
-#     modified_by: Optional[int] = None
-#     modified_date: Optional[datetime] = None
-#     password: Optional[str] = None  # Added password to return default password on creation.
-
-#     class Config:
-#         from_attributes = True  # Enable ORM mode for SQLAlchemy models
 
 class Employee(EmployeeBase):
     employee_id: int

@@ -1,4 +1,5 @@
 # app/api/employee/employee_service.py
+from sqlalchemy import func
 from sqlalchemy.orm import Session # type: ignore
 from ... import models
 from ...models.employees import Gender, MaritalStatus, IDProofType
@@ -13,8 +14,28 @@ from fastapi import HTTPException, status
 
 def create_employee(db: Session, employee: employee_types.EmployeeCreate, created_by: int):
     """
-    Create a new employee.
+    Create a new employee with validation for unique email and employee_code
     """
+    # Check for existing email
+    existing_email = db.query(models.EmployeeHdr).filter(
+        func.lower(models.EmployeeHdr.email) == func.lower(employee.email)
+    ).first()
+    if existing_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="An employee with this email already exists.",
+        )
+
+    # Check for existing employee_code
+    existing_code = db.query(models.EmployeeHdr).filter(
+        models.EmployeeHdr.employee_code == employee.employee_code
+    ).first()
+    if existing_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="An employee with this employee code already exists.",
+        )
+
     try:
         db_employee = models.EmployeeHdr(**employee.dict())
         db_employee.created_by = created_by
@@ -24,32 +45,26 @@ def create_employee(db: Session, employee: employee_types.EmployeeCreate, create
         db.add(db_employee)
         db.commit()
         db.refresh(db_employee)
-        db_employee.password = default_password
+        db_employee.password = default_password  # Only for the response
         return db_employee
     except IntegrityError as e:
-        db.rollback()  # Rollback the transaction to avoid leaving the database in an inconsistent state
+        db.rollback()
+        # This is a fallback in case our manual checks missed something
         if "employee_hdr_email_key" in str(e):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="An employee with this email already exists.",
             )
-        elif "employee_hdr_mobile_no_key" in str(e):
+        elif "employee_hdr_employee_code_key" in str(e):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="An employee with this mobile number already exists.",
+                detail="An employee with this employee code already exists.",
             )
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="An error occurred while creating the employee.",
-            )
-    except ValueError as e:
-        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
+            detail="An error occurred while creating the employee.",
         )
-
+    
 # def get_employee(db: Session, employee_id: int):
 #     """
 #     Get an employee by ID.

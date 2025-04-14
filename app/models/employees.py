@@ -1,5 +1,5 @@
 # app/models/employees.py
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, func, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, UniqueConstraint, func, ForeignKey, Enum
 from sqlalchemy.orm import relationship
 
 from app.models.enums import Gender, MaritalStatus
@@ -17,6 +17,10 @@ class IDProofType(enum.Enum):
 
 class EmployeeHdr(Base):
     __tablename__ = "employee_hdr"
+    __table_args__ = (
+        UniqueConstraint('email', name='employee_hdr_email_key'),
+        UniqueConstraint('employee_code', name='employee_hdr_employee_code_key'),
+    )
 
     employee_id = Column(Integer, primary_key=True, autoincrement=True)
     employee_title = Column(String(50))
