@@ -11,6 +11,9 @@ class PermissionBase(BaseModel):
     action: str
     method: str
 
+    class Config:
+        from_attributes = True
+
 class RoleCreate(BaseModel):
     role_name: str
     role_description: Optional[str] = None
@@ -31,10 +34,10 @@ class RoleResponse(BaseModel):
     role_description: Optional[str]
     is_system_role: bool
     created_by: Optional[int]
-    created_date: datetime
+    created_date: Optional[datetime]
     modified_by: Optional[int]
     modified_date: Optional[datetime]
-    permissions: List[PermissionBase]
+    permissions: Optional[List[PermissionBase]] = None
 
     class Config:
         from_attributes = True

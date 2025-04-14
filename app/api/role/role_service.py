@@ -1,12 +1,13 @@
 # app/services/role_service.py
 from typing import List
 from sqlalchemy.orm import Session
+from app.api.role.role_types import PermissionBase
 from app.models import RoleHdr, RolePermissions, Permissions
 from fastapi import HTTPException, status
 
 def create_role(db: Session, role_data: dict, permission_ids: List[int], created_by: int):
     # Check if role name already exists
-    existing_role = db.query(RoleHdr).filter(RoleHdr.role_name == role_data.role_name).first()
+    existing_role = db.query(RoleHdr).filter(RoleHdr.role_name == role_data.get("role_name")).first()
     if existing_role:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -82,6 +83,7 @@ def add_permissions_to_role(db: Session, role_id: int, permission_ids: List[int]
     return role
 
 def get_role_with_permissions(db: Session, role_id: int):
+    # Get role with all fields
     role = db.query(RoleHdr).filter(RoleHdr.role_id == role_id).first()
     if not role:
         raise HTTPException(
@@ -89,7 +91,7 @@ def get_role_with_permissions(db: Session, role_id: int):
             detail="Role not found"
         )
     
-    # Eager load permissions
+    # Get permissions and convert to Pydantic models
     permissions = (
         db.query(Permissions)
         .join(RolePermissions, Permissions.permission_id == RolePermissions.permission_id)
@@ -97,7 +99,10 @@ def get_role_with_permissions(db: Session, role_id: int):
         .all()
     )
     
-    return role, permissions
+    # Convert permissions to PermissionBase models
+    permission_bases = [PermissionBase.from_orm(p) for p in permissions]
+    
+    return role, permission_bases
 
 def get_all_permissions(db: Session):
     """

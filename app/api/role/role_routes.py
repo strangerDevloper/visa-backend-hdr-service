@@ -24,16 +24,33 @@ def create_new_role(
     current_employee: CurrentUser,
     db: Session = Depends(get_db),
 ):
-    print("hereeeeee")
     try:
+        # Create the role
         new_role = create_role(
             db=db,
             role_data=role_data.dict(exclude={"permission_ids"}),
             permission_ids=role_data.permission_ids,
             created_by=current_employee.employee_id
         )
+        
+        # Get the role with permissions
         role, permissions = get_role_with_permissions(db, new_role.role_id)
-        return role
+        
+        # Construct the response
+        response = RoleResponse(
+            role_id=role.role_id,
+            role_name=role.role_name,
+            role_description=role.role_description,
+            is_system_role=role.is_system_role,
+            created_by=role.created_by,
+            created_date=role.created_date,
+            modified_by=role.modified_by,
+            modified_date=role.modified_date,
+            permissions=permissions  # Now properly formatted as PermissionBase instances
+        )
+        
+        return response
+        
     except HTTPException as e:
         raise e
     except Exception as e:
@@ -168,7 +185,7 @@ def update_role_permissions(
             detail=str(e)
         )
 
-@router.delete("/{role_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{role_id}", status_code=status.HTTP_200_OK)
 def delete_role_api(
     role_id: int, 
     current_employee: CurrentEmployee,
@@ -176,7 +193,7 @@ def delete_role_api(
 ):
     try:
         delete_role(db, role_id)
-        return
+        return {"message": "Role deleted successfully"}
     except HTTPException as e:
         raise e
     except Exception as e:
@@ -184,4 +201,3 @@ def delete_role_api(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
-    
