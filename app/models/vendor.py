@@ -13,6 +13,8 @@ class VendorStatus(enum.Enum):
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
     SUSPENDED = "SUSPENDED"
+    HOLD = "HOLD"
+    BLACKLISTED = "BLACKLISTED"
 
 
 class Vendor(Base):
@@ -40,6 +42,7 @@ class Vendor(Base):
     approved_date = Column(DateTime, nullable=True)
     created_date = Column(DateTime, server_default=func.now())
     modified_date = Column(DateTime, onupdate=func.now())
+    remarks = Column(String(255), nullable=True)
 
     # Relationships
     documents = relationship("VendorDocument", back_populates="vendor")

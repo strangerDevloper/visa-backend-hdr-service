@@ -1,19 +1,18 @@
 # app/api/vendor/vendor_routes.py
-from datetime import datetime
 from typing import List
-import uuid
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from app.api.vendor.vendor_service import VendorService
 from app.config.database import get_db
 from app.config.aws import AWSService
-from app.core.constants import USER_TYPE_VENDOR
-from app.helpers import auth_utils
-from app.models.vendor import Vendor, VendorStatus
-from app.models.vendor_document import VendorDocument, VerificationStatus
 from ..dependencies import CurrentEmployee, CurrentVendor  # Updated imports
-from . import vendor_service
 from .vendor_types import (
+    DocumentApprovalResponse,
+    SecurityUpdateResponse,
+    UploadDocumentRequest,
+    VendorPersonalDetailsUpdate,
+    VendorSecurityUpdate,
     VendorSignup,
     VendorSignupResponse,
     VendorTemporaryCreate,
@@ -26,172 +25,233 @@ from .vendor_types import (
 
 router = APIRouter(prefix="/vendors", tags=["vendors"])
 
-
 # Initialize the AWS Service
 aws_service = AWSService()
 
-# @router.post("/signup", response_model=VendorSignupResponse)
-# def signup_vendor(
-#     vendor: VendorSignup, 
-#     db: Session = Depends(get_db)
-# ):
-#     # Check if vendor exists
-#     if vendor_service.get_vendor_by_email(db, vendor.email):
-#         raise HTTPException(
-#             status_code=400,
-#             detail="Email already registered"
-#         )
-    
-#     # Separate main data from documents
-#     vendor_data = vendor.model_dump(exclude={"documents"})
-#     documents = vendor.documents
-    
-#     try:
-#         new_vendor = vendor_service.create_vendor_with_documents(
-#             db, 
-#             vendor_data, 
-#             documents
-#         )
-#         return VendorSignupResponse(
-#             vendor_id=new_vendor.vendor_id,
-#             email=new_vendor.email,
-#             status=new_vendor.status,
-#             **vendor_data  # Include all other fields
-#         )
-#     except Exception as e:
-#         raise HTTPException(
-#             status_code=500,
-#             detail=f"Failed to create vendor: {str(e)}"
-#         )
-
-@router.post("/signup-initial", response_model=VendorTemporaryResponse)
-def signup_initial(
+@router.post(
+    "/temporary",
+    response_model=VendorTemporaryResponse,
+    summary="Create temporary vendor",
+    description="Initial signup without documents to get vendor UID for document upload",
+    status_code=201
+)
+def create_temporary_vendor(
     vendor: VendorTemporaryCreate,
     db: Session = Depends(get_db)
 ):
-    # Check if email exists
-    if vendor_service.get_vendor_by_email(db, vendor.email):
-        raise HTTPException(400, "Email already registered")
+    try:
+        db_vendor = VendorService.create_temporary_vendor(db, vendor)
+        return VendorTemporaryResponse(
+            vendor_uid=db_vendor.vendor_uid,
+            vendor_code=db_vendor.vendor_code
+        )
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create temporary vendor: {str(e)}"
+        )
 
-    # Generate unique IDs
-    vendor_uid = str(uuid.uuid4())
-    vendor_code = f"VEND-{datetime.now().strftime('%Y%m%d')}-{vendor_uid[:8].upper()}"
-
-    # Create temporary vendor
-    db_vendor = Vendor(
-        **vendor.model_dump(),
-        vendor_uid=vendor_uid,
-        vendor_code=vendor_code,
-        status=VendorStatus.TEMPORARY.value,
-        is_temporary=True
-    )
-    
-    db.add(db_vendor)
-    db.commit()
-
-    return VendorTemporaryResponse(
-        vendor_uid=vendor_uid,
-        vendor_code=vendor_code
-    )
-
-@router.put("/{vendor_uid}/complete-signup", response_model=VendorSignupResponse)
-def complete_signup(
+@router.patch(
+    "/{vendor_uid}/complete",
+    response_model=VendorSignupResponse,
+    summary="Complete vendor registration",
+    description="Submit required documents to complete registration and change status to PENDING",
+    responses={
+        400: {"description": "Vendor is not in temporary status"},
+        404: {"description": "Vendor not found"},
+        422: {"description": "Invalid document type"},
+        500: {"description": "Internal server error"}
+    }
+)
+def complete_vendor_signup(
     vendor_uid: str,
-    documents: List[dict],  # Expects output from upload-documents
+    documents: List[UploadDocumentRequest],
     db: Session = Depends(get_db)
 ):
-    vendor = db.query(Vendor).filter(Vendor.vendor_uid == vendor_uid).first()
-    if not vendor or not vendor.is_temporary:
-        raise HTTPException(404, "Temporary vendor not found")
-
+    """
+    Complete vendor signup by:
+    1. Validating all documents
+    2. Creating document records
+    3. Updating vendor status
+    
+    Returns basic vendor information with success message
+    """
     try:
-        # Create document records
-        for doc in documents:
-            db_doc = VendorDocument(
-                vendor_id=vendor.vendor_id,
-                document_type=doc["document_type"],
-                document_number=doc["document_number"],
-                document_path=doc["s3_key"],
-                verification_status=VerificationStatus.PENDING.value
-            )
-            db.add(db_doc)
-
-        # Mark vendor as pending (no longer temporary)
-        vendor.is_temporary = False
-        vendor.status = VendorStatus.PENDING.value
-        db.commit()
-
+        vendor = VendorService.complete_vendor_signup(db, vendor_uid, documents)
         return VendorSignupResponse(
             vendor_id=vendor.vendor_id,
             email=vendor.email,
-            status=vendor.status
+            status=vendor.status,
+            vendor_code=vendor.vendor_code
+        )
+    except HTTPException as he:
+        # Re-raise known HTTP exceptions
+        raise he
+    except ValueError as ve:
+        # Handle document validation errors
+        raise HTTPException(
+            status_code=422,
+            detail=str(ve)
         )
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to complete vendor signup. Please try again later."
+        )
 
 @router.post("/signin", response_model=VendorToken)
 def signin_vendor(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
-    db_vendor = vendor_service.get_vendor_by_email(db, form_data.username)
-    if not db_vendor or not db_vendor.password_hash:
-        raise HTTPException(status_code=401, detail="Account not approved or invalid email")
-    
-    if not auth_utils.verify_password(form_data.password, db_vendor.password_hash):
-        raise HTTPException(status_code=401, detail="Incorrect password")
-    
-    if db_vendor.status != "APPROVED":
-        raise HTTPException(status_code=403, detail="Account not approved yet")
-    
-    access_token = auth_utils.create_access_token(
-        data={"sub": str(db_vendor.vendor_id)},
-        user_type=USER_TYPE_VENDOR
-    )
-    vendor_service.update_login_info(db, db_vendor.vendor_id)
-    return VendorToken(access_token=access_token)
+    """Authenticate vendor and return access token"""
+    try:
+        vendor = VendorService.authenticate_vendor(db, form_data.username, form_data.password)
+        access_token = VendorService.generate_access_token(vendor.vendor_id)
+        VendorService.update_login_info(db, vendor.vendor_id)
+        return VendorToken(access_token=access_token)
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(500, detail=f"Authentication failed: {str(e)}")
 
-@router.post("/approve", response_model=VendorPublic)
-def approve_vendor(
-    approval: VendorApprove,
-    current_employee: CurrentEmployee,  # Only employees can access
-    db: Session = Depends(get_db),
+@router.post(
+    "/documents/{document_id}/approve",
+    response_model=DocumentApprovalResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Approve a vendor document",
+    responses={
+        403: {"description": "Not authorized to approve documents"},
+        404: {"description": "Document not found"},
+        409: {"description": "Document already approved/rejected"},
+        500: {"description": "Internal server error"}
+    }
+)
+def approve_vendor_document(
+    document_id: int,
+    current_employee: CurrentEmployee,
+    db: Session = Depends(get_db)
 ):
-    
-    if not current_employee.employee_id:
-        raise HTTPException(status_code=403, detail="Not authorized to approve vendors")
-    
-    approved_vendor = vendor_service.approve_vendor(
-        db, 
-        approval.vendor_id, 
-        current_employee.employee_id
-    )
-    if not approved_vendor:
-        raise HTTPException(status_code=404, detail="Vendor not found")
-    
-    return approved_vendor
+    """
+    Approve a specific vendor document. Requires employee privileges.
+    """
+    try:
+        if not current_employee.employee_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to approve documents"
+            )
+        
+        result = VendorService.approve_vendor_document(
+            db=db,
+            document_id=document_id,
+            approved_by=current_employee.employee_id
+        )
+        
+        return DocumentApprovalResponse(
+            document_id=document_id,
+            status=result.verification_status,
+            message="Document approved successfully"
+        )
+        
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Document approval failed"
+        )
 
-@router.get("/me", response_model=VendorPublic)
-def get_my_profile(
-    current_vendor: CurrentVendor  # Only vendors can access
-):
+# Profile Management Routes
+@router.get(
+    "/me",
+    response_model=VendorPublic,
+    summary="Get current vendor profile",
+    description="Retrieve the complete profile of the currently authenticated vendor"
+)
+def get_my_profile(current_vendor: CurrentVendor):
+    """Get authenticated vendor's profile"""
     return current_vendor
 
-@router.patch("/me", response_model=VendorPublic)
-def update_my_profile(
-    updates: VendorProfileUpdate,
-    current_vendor: CurrentVendor,  # Only vendors can access
-    db: Session = Depends(get_db),
+@router.patch(
+    "/me/details",
+    response_model=VendorPublic,
+    summary="Update vendor personal details",
+    description="Update basic personal information of the vendor",
+    responses={
+        400: {"description": "Invalid data provided"},
+        500: {"description": "Failed to update profile"}
+    }
+)
+def update_personal_details(
+    updates: VendorPersonalDetailsUpdate,
+    current_vendor: CurrentVendor,
+    db: Session = Depends(get_db)
 ):
-    updated_vendor = vendor_service.update_vendor_profile(
-        db, 
-        current_vendor.vendor_id, 
-        updates
-    )
-    if not updated_vendor:
-        raise HTTPException(status_code=404, detail="Vendor not found")
-    return updated_vendor
+    """
+    Update vendor's personal details including:
+    - First name
+    - Last name
+    - Contact information
+    - Address details
+    """
+    try:
+        updated_vendor = VendorService.update_vendor_personal_details(
+            db=db,
+            vendor_id=current_vendor.vendor_id,
+            updates=updates
+        )
+        return updated_vendor
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update personal details"
+        )
+
+@router.patch(
+    "/me/security",
+    response_model=SecurityUpdateResponse,
+    summary="Update security information",
+    description="Update sensitive security information like email or password",
+    responses={
+        400: {"description": "Invalid current password"},
+        500: {"description": "Failed to update security information"}
+    }
+)
+def update_security_info(
+    updates: VendorSecurityUpdate,
+    current_vendor: CurrentVendor,
+    db: Session = Depends(get_db)
+):
+    """
+    Update vendor's security information including:
+    - Email address
+    - Password (requires current password verification)
+    """
+    try:
+        result = VendorService.update_vendor_security(
+            db=db,
+            vendor_id=current_vendor.vendor_id,
+            current_password=current_vendor.password_hash,
+            updates=updates
+        )
+        return result
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update security information"
+        )
 
 @router.post("/{vendor_uid}/upload-documents")
 async def upload_vendor_documents(
@@ -201,40 +261,28 @@ async def upload_vendor_documents(
     document_numbers: List[str] = Form(...),
     db: Session = Depends(get_db)
 ):
+    """Upload documents for a vendor"""
     try:
-        # Verify vendor exists (temporary or regular)
-        vendor = db.query(Vendor).filter(Vendor.vendor_uid == vendor_uid).first()
+        # Verify vendor exists
+        vendor = VendorService.get_vendor_by_vendor_uid(db, vendor_uid)
         if not vendor:
             raise HTTPException(404, "Vendor not found")
 
-        if len(files) != len(document_types) or len(files) != len(document_numbers):
-            raise HTTPException(400, "Mismatched file/document info count")
+        # Upload documents to S3
+        uploads = VendorService.upload_documents_to_s3(
+            aws_service,
+            vendor_uid,
+            files,
+            document_types,
+            document_numbers
+        )
 
-        results = []
-        for file, doc_type, doc_number in zip(files, document_types, document_numbers):
-            # Generate S3 path: vendors/{vendor_uid}/documents/{doc_type}_{uuid}.ext
-            file_ext = file.filename.split('.')[-1].lower()
-            s3_key = f"vendors/{vendor_uid}/documents/{doc_type}_{uuid.uuid4()}.{file_ext}"
-
-            # Upload to S3 (using your existing AWS service)
-            file.file.seek(0)
-            aws_service.s3_client.upload_fileobj(
-                file.file,
-                aws_service.bucket_name,
-                s3_key,
-                ExtraArgs={
-                    'ContentType': file.content_type,
-                    'ACL': 'private'  # Set appropriate permissions
-                }
-            )
-
-            results.append({
-                "document_type": doc_type,
-                "document_number": doc_number,
-                "s3_key": s3_key
-            })
-
-        return {"success_count": len(results), "uploads": results}
-
+        return {
+            "success": True,
+            "count": len(uploads),
+            "documents": uploads
+        }
+    except HTTPException as he:
+        raise he
     except Exception as e:
-        raise HTTPException(500, detail=str(e))
+        raise HTTPException(500, detail=f"Document upload failed: {str(e)}")

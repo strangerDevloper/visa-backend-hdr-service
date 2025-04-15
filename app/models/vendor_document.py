@@ -11,6 +11,8 @@ class DocumentType(enum.Enum):
     PASSPORT = "PASSPORT"
     DRIVING_LICENSE = "DRIVING_LICENSE"
     VOTER_ID = "VOTER_ID"
+    MOU = "MOU"
+    BANK_STATEMENT = "BANK_STATEMENT"
     OTHER = "OTHER"
 
 class VerificationStatus(enum.Enum):
@@ -29,6 +31,7 @@ class VendorDocument(Base):
     verification_status = Column(Enum(VerificationStatus), default=VerificationStatus.PENDING)
     uploaded_at = Column(DateTime, server_default=func.now())
     approved_by = Column(Integer, ForeignKey('employee_hdr.employee_id'), nullable=True)
+    remarks = Column(String(255), nullable=True)
 
     # Relationships
     vendor = relationship("Vendor", back_populates="documents")

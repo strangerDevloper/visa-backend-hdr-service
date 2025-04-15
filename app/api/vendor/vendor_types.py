@@ -10,6 +10,26 @@ class VendorStatus(str, Enum):
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
     SUSPENDED = "SUSPENDED"
+    HOLD = "HOLD"
+    BLACKLISTED = "BLACKLISTED"
+
+class DocumentTypeEnum(str, Enum):
+    AADHAR = "AADHAR"
+    PAN = "PAN"
+    GST = "GST"
+    PASSPORT = "PASSPORT"
+    DRIVING_LICENSE = "DRIVING_LICENSE"
+    VOTER_ID = "VOTER_ID"
+    MOU = "MOU"
+    BANK_STATEMENT = "BANK_STATEMENT"
+    OTHER = "OTHER"
+
+
+class UploadDocumentRequest(BaseModel):
+    document_type: DocumentTypeEnum
+    document_number: str
+    s3_key: str
+
 
 class VendorBase(BaseModel):
     first_name: str
@@ -54,11 +74,13 @@ class VendorCreate(VendorBase):
 class VendorSignup(VendorBase):
     documents: List[VendorDocumentCreate]  # Add documents to signup payload
 
-class VendorSignupResponse(VendorSignup):
+class VendorSignupResponse(BaseModel):
     vendor_id: int
+    email: str
     status: str
+    vendor_code: str
     message: str = "Vendor signup successful. Waiting for admin approval."
-    
+
     class Config:
         from_attributes = True
 
@@ -85,3 +107,27 @@ class VendorPublic(VendorBase):
 
     class Config:
         from_attributes = True  # Enable ORM mode for SQLAlchemy models
+
+
+class DocumentApprovalResponse(BaseModel):
+    document_id: int
+    status: str
+    message: str
+
+class VendorPersonalDetailsUpdate(BaseModel):
+    first_name: Optional[str] = None
+    middle_name: Optional[str] = None
+    last_name: Optional[str] = None
+    contact_no: Optional[str] = None
+    pincode: Optional[str] = None
+    address: Optional[str] = None
+
+class VendorSecurityUpdate(BaseModel):
+    current_password: str
+    new_email: Optional[EmailStr] = None
+    new_password: Optional[str] = None
+
+class SecurityUpdateResponse(BaseModel):
+    email_updated: bool = False
+    password_updated: bool = False
+    message: str = "Security information updated successfully"
