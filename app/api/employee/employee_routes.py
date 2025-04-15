@@ -53,10 +53,10 @@ def update_employee(employee_id: int, employee_update: employee_types.EmployeeUp
         raise HTTPException(status_code=404, detail="Employee not found")
     return db_employee
 
-@router.delete("/{employee_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{employee_id}", status_code=status.HTTP_200_OK)
 def delete_employee(employee_id: int, current_employee: CurrentEmployee, db: Session = Depends(get_db)):
     employee_service.delete_employee(db, employee_id, current_employee.employee_id)
-    return
+    return {"message": "Employee deleted successfully"}
 
 @router.post("/{employee_id}/roles", response_model=employee_types.EmployeeRoleResponse, status_code=status.HTTP_201_CREATED)
 def assign_role_to_employee(
