@@ -4,6 +4,8 @@ from typing import List, Optional
 from pydantic import BaseModel, EmailStr
 from enum import Enum
 
+from app.models.vendor_document import VerificationStatus
+
 class VendorStatus(str, Enum):
     TEMPORARY = "TEMPORARY"  # New status
     PENDING = "PENDING"
@@ -42,6 +44,7 @@ class VendorBase(BaseModel):
     marital_status: str
     pincode: str
     address: str
+    vendor_uid: str
 
 
 # app/api/vendor/vendor_types.py
@@ -131,3 +134,25 @@ class SecurityUpdateResponse(BaseModel):
     email_updated: bool = False
     password_updated: bool = False
     message: str = "Security information updated successfully"
+
+class PaginatedVendorsResponse(BaseModel):
+    items: List[VendorPublic]
+    total: int
+    page: int
+    per_page: int
+    total_pages: int
+
+class VendorDocumentResponse(BaseModel):
+    vendor_document_id: int
+    document_type: DocumentTypeEnum
+    document_number: str
+    document_path: str
+    verification_status: VerificationStatus
+    uploaded_at: datetime
+    presigned_url: Optional[str] = None
+
+class VendorWithDocumentsResponse(VendorPublic):
+    documents: List[VendorDocumentResponse]
+
+    class Config:
+        from_attributes = True

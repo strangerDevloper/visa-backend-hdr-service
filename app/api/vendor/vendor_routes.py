@@ -1,6 +1,6 @@
 # app/api/vendor/vendor_routes.py
-from typing import List
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from typing import List, Optional
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app.api.vendor.vendor_service import VendorService
@@ -9,18 +9,21 @@ from app.config.aws import AWSService
 from ..dependencies import CurrentEmployee, CurrentVendor  # Updated imports
 from .vendor_types import (
     DocumentApprovalResponse,
+    PaginatedVendorsResponse,
     SecurityUpdateResponse,
     UploadDocumentRequest,
     VendorPersonalDetailsUpdate,
     VendorSecurityUpdate,
     VendorSignup,
     VendorSignupResponse,
+    VendorStatus,
     VendorTemporaryCreate,
     VendorTemporaryResponse,
     VendorToken,
     VendorPublic,
     VendorProfileUpdate,
-    VendorApprove
+    VendorApprove,
+    VendorWithDocumentsResponse
 )
 
 router = APIRouter(prefix="/vendors", tags=["vendors"])
@@ -102,6 +105,82 @@ def complete_vendor_signup(
             status_code=500,
             detail="Failed to complete vendor signup. Please try again later."
         )
+
+@router.get(
+    "/",
+    response_model=PaginatedVendorsResponse,
+    summary="Get filtered and paginated vendors",
+    responses={
+        200: {"description": "Paginated list of vendors"},
+        400: {"description": "Invalid filter parameters"}
+    }
+)
+def get_all_vendors(
+    current_employee: CurrentEmployee,
+    db: Session = Depends(get_db),
+    name: Optional[str] = Query(None, description="Filter by name (partial match)"),
+    vendor_code: Optional[str] = Query(None, description="Filter by exact vendor code"),
+    vendor_uid: Optional[str] = Query(None, description="Filter by exact vendor UID"),
+    status: Optional[VendorStatus] = Query(None, description="Filter by status"),
+    page: int = Query(1, ge=1, description="Page number"),
+    per_page: int = Query(10, ge=1, le=100, description="Items per page")
+):
+    """
+    Get paginated vendors with optional filters:
+    - name: Partial match on first/last name
+    - vendor_code: Exact match
+    - vendor_uid: Exact match
+    - status: Filter by status
+    """
+    try:
+        vendors, total = VendorService.get_filtered_vendors(
+            db=db,
+            name=name,
+            vendor_code=vendor_code,
+            vendor_uid=vendor_uid,
+            status=status.value if status else None,
+            page=page,
+            per_page=per_page
+        )
+        
+        total_pages = (total + per_page - 1) // per_page
+        
+        return PaginatedVendorsResponse(
+            items=vendors,
+            total=total,
+            page=page,
+            per_page=per_page,
+            total_pages=total_pages
+        )
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid filter parameters: {str(e)}"
+        )
+
+@router.get(
+    "/{identifier}",
+    response_model=VendorWithDocumentsResponse,
+    summary="Get vendor by ID, code, or UID",
+    responses={
+        200: {"description": "Vendor details"},
+        404: {"description": "Vendor not found"},
+        400: {"description": "Invalid identifier format"}
+    }
+)
+def get_vendor(
+    identifier: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Get vendor by:
+    - Database ID (integer)
+    - vendor_code (string starting with VEND-)
+    - vendor_uid (UUID string)
+    """
+    return VendorService.get_vendor_with_documents(aws_service,db, identifier)
 
 @router.post("/signin", response_model=VendorToken)
 def signin_vendor(

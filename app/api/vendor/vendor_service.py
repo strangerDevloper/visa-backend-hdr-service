@@ -2,7 +2,7 @@ from datetime import datetime
 import uuid
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from botocore.exceptions import ClientError
 
 from app.core.constants import USER_TYPE_VENDOR
@@ -190,6 +190,11 @@ class VendorService:
         return db.query(Vendor).filter(Vendor.vendor_id == vendor_id).first()
     
     @staticmethod
+    def get_vendor_by_vendor_uid(db: Session, vendor_uid: str) -> Optional[Vendor]:
+        """Get vendor by UID"""
+        return db.query(Vendor).filter(Vendor.vendor_uid == vendor_uid).first()
+
+    @staticmethod
     def approve_vendor_document(
         db: Session,
         document_id: int,
@@ -234,6 +239,118 @@ class VendorService:
         db.commit()
         db.refresh(vendor)
         return vendor
+
+    @staticmethod
+    def _build_vendor_query(
+        db: Session,
+        name: Optional[str] = None,
+        vendor_code: Optional[str] = None,
+        vendor_uid: Optional[str] = None,
+        status: Optional[str] = None
+    ):
+        """Build the base filtered query"""
+        query = db.query(Vendor)
+        
+        if name:
+            query = query.filter(
+                (Vendor.first_name.ilike(f"%{name}%")) |
+                (Vendor.last_name.ilike(f"%{name}%"))
+            )
+        if vendor_code:
+            query = query.filter(Vendor.vendor_code == vendor_code)
+        if vendor_uid:
+            query = query.filter(Vendor.vendor_uid == vendor_uid)
+        if status:
+            query = query.filter(Vendor.status == status)
+            
+        return query
+
+    @staticmethod
+    def get_filtered_vendors(
+        db: Session,
+        name: Optional[str] = None,
+        vendor_code: Optional[str] = None,
+        vendor_uid: Optional[str] = None,
+        status: Optional[str] = None,
+        page: int = 1,
+        per_page: int = 10
+    ) -> Tuple[List[Vendor], int]:
+        """
+        Get paginated and filtered vendors
+        Returns tuple of (vendors, total_count)
+        """
+        query = VendorService._build_vendor_query(
+            db, name, vendor_code, vendor_uid, status
+        )
+        
+        total_count = query.count()
+        offset = (page - 1) * per_page
+        vendors = query.offset(offset).limit(per_page).all()
+        
+        return vendors, total_count
+
+    @staticmethod
+    def get_vendor_by_identifier(
+        db: Session,
+        identifier: str
+    ) -> Vendor:
+        """
+        Get vendor by ID, code, or UID
+        Raises HTTPException(404) if not found
+        """
+        try:
+            # Try to parse as integer (ID)
+            if identifier.isdigit():
+                vendor = db.query(Vendor).filter(Vendor.vendor_id == int(identifier)).first()
+            # Check if it's a vendor code (starts with VEND-)
+            elif identifier.startswith("VEND-"):
+                vendor = db.query(Vendor).filter(Vendor.vendor_code == identifier).first()
+            # Otherwise treat as vendor_uid (UUID)
+            else:
+                vendor = db.query(Vendor).filter(Vendor.vendor_uid == identifier).first()
+            
+            if not vendor:
+                raise HTTPException(status_code=404, detail="Vendor not found")
+                
+            return vendor
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid identifier: {str(e)}"
+            )
+        
+    @staticmethod
+    def get_vendor_with_documents(
+        aws_service,
+        db: Session,
+        identifier: str
+    ) -> dict:
+        """
+        Get vendor with documents by ID, code, or UID
+        Returns dictionary with vendor and documents
+        """
+        vendor = VendorService.get_vendor_by_identifier(db, identifier)
+        
+        documents = db.query(VendorDocument).filter(
+            VendorDocument.vendor_id == vendor.vendor_id
+        ).all()
+        
+        documents_with_presigned_url = []
+        for doc in documents:
+            presigned_url = None
+            try:
+                presigned_url = aws_service.generate_presigned_url(doc.document_path)
+            except ClientError as e:
+                print(f"Error generating presigned URL: {str(e)}")
+            
+            documents_with_presigned_url.append({
+                **doc.__dict__,
+                "presigned_url": presigned_url
+            })
+        return {
+            **vendor.__dict__,
+            "documents": documents
+        }
 
     @staticmethod
     def update_vendor_security(
