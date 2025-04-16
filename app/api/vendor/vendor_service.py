@@ -1,6 +1,7 @@
 from datetime import datetime
 import uuid
 from fastapi import HTTPException, UploadFile, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import List, Optional, Tuple
 from botocore.exceptions import ClientError
@@ -412,3 +413,90 @@ class VendorService:
         
         db.commit()
         return response
+    
+    @staticmethod
+    def update_vendor_status(
+        db: Session,
+        vendor_id: int,
+        new_status: VendorStatus,
+        updated_by: int,
+        remarks: Optional[str] = None
+    ) -> Tuple[Vendor, Optional[str]]:
+        """
+        Update vendor status with validation
+        - For APPROVED status: 
+            - Checks all documents are approved
+            - Generates temporary password
+            - Returns tuple of (vendor, temporary_password)
+        - For other statuses: Returns (vendor, None)
+        """
+        vendor: Vendor = db.query(Vendor).get(vendor_id)
+        if not vendor:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Vendor not found"
+            )
+
+        current_status = vendor.status
+        temp_password = None
+
+        # Check document approval requirement for APPROVED status
+        if new_status == VendorStatus.APPROVED:
+            unapproved_docs = db.query(VendorDocument).filter(
+                VendorDocument.vendor_id == vendor_id,
+                VendorDocument.verification_status != VerificationStatus.VERIFIED.value
+            ).count()
+            
+            if unapproved_docs > 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Cannot approve vendor with {unapproved_docs} unapproved documents"
+                )
+
+            # Generate temporary password only for APPROVED status
+            temp_password = auth_utils.generate_random_password()
+            vendor.password_hash = auth_utils.get_password_hash(temp_password)
+
+        # Validate status transition
+        valid_transitions = {
+            VendorStatus.PENDING: [VendorStatus.APPROVED, VendorStatus.REJECTED, VendorStatus.HOLD],
+            VendorStatus.HOLD: [VendorStatus.APPROVED, VendorStatus.REJECTED, VendorStatus.PENDING],
+            VendorStatus.TEMPORARY: [VendorStatus.PENDING, VendorStatus.REJECTED],
+            VendorStatus.APPROVED: [VendorStatus.SUSPENDED, VendorStatus.REJECTED, VendorStatus.HOLD, VendorStatus.BLACKLISTED],
+            VendorStatus.REJECTED: [VendorStatus.PENDING, VendorStatus.HOLD],
+        }
+
+        if current_status in valid_transitions and new_status not in valid_transitions[current_status]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot change status from {current_status.value} to {new_status.value}"
+            )
+
+        # Update status and tracking fields
+        vendor.status = new_status
+        vendor.modified_date = datetime.now()
+        
+        if new_status == VendorStatus.APPROVED:
+            vendor.approved_by = updated_by
+            vendor.approved_date = datetime.now()
+        
+        if remarks:
+            vendor.remarks = remarks
+
+        db.commit()
+        db.refresh(vendor)
+        return vendor, temp_password
+
+    @staticmethod
+    def get_vendor_document_status(vendor_id: int, db: Session) -> dict:
+        """Get counts of documents by status for a vendor"""
+        status_counts = db.query(
+            VendorDocument.verification_status,
+            func.count(VendorDocument.vendor_document_id)
+        ).filter(
+            VendorDocument.vendor_id == vendor_id
+        ).group_by(
+            VendorDocument.verification_status
+        ).all()
+        
+        return dict(status_counts)

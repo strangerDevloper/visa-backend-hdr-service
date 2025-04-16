@@ -1,12 +1,13 @@
 # app/api/vendor/vendor_routes.py
 from datetime import datetime
-import hashlib
+import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app.api.vendor.vendor_service import VendorService
 from app.config.database import get_db
+from app.helpers.email_utils import email_sender
 from app.config.aws import AWSService
 from ..dependencies import CurrentEmployee, CurrentVendor  # Updated imports
 from .vendor_types import (
@@ -21,6 +22,8 @@ from .vendor_types import (
     VendorSignup,
     VendorSignupResponse,
     VendorStatus,
+    VendorStatusUpdateRequest,
+    VendorStatusUpdateResponse,
     VendorTemporaryCreate,
     VendorTemporaryResponse,
     VendorToken,
@@ -34,6 +37,7 @@ router = APIRouter(prefix="/vendors", tags=["vendors"])
 
 # Initialize the AWS Service
 aws_service = AWSService()
+logger = logging.getLogger(__name__)  # Get logger for the current module
 
 @router.post(
     "/temporary",
@@ -323,6 +327,145 @@ def reject_vendor_document(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Document rejection failed"
+        )
+    
+# @router.patch(
+#     "/{vendor_id}/status",
+#     response_model=VendorStatusUpdateResponse,
+#     status_code=status.HTTP_200_OK,
+#     summary="Update vendor status",
+#     responses={
+#         400: {"description": "Invalid status transition or unapproved documents"},
+#         403: {"description": "Not authorized to update status"},
+#         404: {"description": "Vendor not found"},
+#         500: {"description": "Internal server error"}
+#     }
+# )
+# def update_vendor_status(
+#     vendor_id: int,
+#     status_data: VendorStatusUpdateRequest,
+#     current_employee: CurrentEmployee,
+#     db: Session = Depends(get_db)
+# ):
+#     """
+#     Update vendor status with validation:
+#     - For APPROVED status: 
+#         - All documents must be VERIFIED
+#         - Generates and returns temporary password
+#         - Stores hashed password in database
+#     - Validates status transitions
+#     - Tracks who made the change
+    
+#     Required permissions: Employee with approval rights
+#     """
+#     try:
+#         if not current_employee.employee_id:
+#             raise HTTPException(
+#                 status_code=status.HTTP_403_FORBIDDEN,
+#                 detail="Not authorized to update vendor status"
+#             )
+
+#         vendor, temp_password = VendorService.update_vendor_status(
+#             db=db,
+#             vendor_id=vendor_id,
+#             new_status=status_data.status,
+#             updated_by=current_employee.employee_id,
+#             remarks=status_data.remarks
+#         )
+
+#         response = VendorStatusUpdateResponse(
+#             vendor_id=vendor.vendor_id,
+#             status=vendor.status,
+#             message=f"Vendor status updated to {vendor.status}",
+#             remarks=status_data.remarks,
+#             updated_by=current_employee.employee_id,
+#             updated_at=datetime.now()
+#         )
+
+#         # Only include password in response for APPROVED status
+#         if status_data.status == VendorStatus.APPROVED and temp_password:
+#             response.temporary_password = temp_password
+#             # Consider sending email with password here
+
+#         return response
+
+#     except HTTPException as he:
+#         raise he
+#     except Exception as e:
+#         db.rollback()
+#         print(f"Status update error: {str(e)}")
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail="Status update failed"
+#         )
+
+@router.patch(
+    "/{vendor_id}/status",
+    response_model=VendorStatusUpdateResponse,
+    status_code=status.HTTP_200_OK
+)
+def update_vendor_status(
+    vendor_id: int,
+    status_data: VendorStatusUpdateRequest,
+    current_employee: CurrentEmployee,
+    db: Session = Depends(get_db)
+):
+    """
+    Update vendor status with:
+    - Status change validation
+    - Password generation for APPROVED status
+    - Email notification for all status changes
+    """
+    try:
+        if not current_employee.employee_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to update vendor status"
+            )
+
+        vendor, temp_password = VendorService.update_vendor_status(
+            db=db,
+            vendor_id=vendor_id,
+            new_status=status_data.status,
+            updated_by=current_employee.employee_id,
+            remarks=status_data.remarks
+        )
+
+        # Prepare response
+        response = VendorStatusUpdateResponse(
+            vendor_id=vendor.vendor_id,
+            status=vendor.status,
+            message=f"Vendor status updated to {vendor.status}",
+            remarks=status_data.remarks,
+            updated_by=current_employee.employee_id,
+            updated_at=datetime.now()
+        )
+
+        # Add password to response if approved
+        if status_data.status == VendorStatus.APPROVED and temp_password:
+            response.temporary_password = temp_password
+
+        # Send email notification (don't fail the request if email fails)
+        try:
+            email_sender.send_status_change_email(
+                to_email=vendor.email,
+                status=status_data.status.value,
+                password=temp_password if status_data.status == VendorStatus.APPROVED else None
+            )
+        except Exception as email_error:
+            logger.error(f"Email sending failed: {str(email_error)}")
+            # Continue even if email fails - the status change was successful
+
+        return response
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Status update failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Status update failed"
         )
 
 # Profile Management Routes

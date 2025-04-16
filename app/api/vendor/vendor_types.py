@@ -186,3 +186,24 @@ class VendorWithDocumentsResponse(VendorPublic):
 
     class Config:
         from_attributes = True
+
+class VendorStatusUpdateRequest(BaseModel):
+    status: VendorStatus
+    remarks: Optional[str] = Field(
+        None,
+        description="Optional remarks for the status change",
+        example="All documents verified"
+    )
+
+class VendorStatusUpdateResponse(BaseModel):
+    vendor_id: int
+    status: str
+    message: str
+    remarks: Optional[str] = None
+    updated_by: int
+    updated_at: datetime
+    temporary_password: Optional[str] = Field(
+        None,
+        description="Temporary password generated when status changes to APPROVED",
+        example="Xk8!9sD2"
+    )
