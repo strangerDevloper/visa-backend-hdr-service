@@ -11,6 +11,8 @@ from app.config.aws import AWSService
 from ..dependencies import CurrentEmployee, CurrentVendor  # Updated imports
 from .vendor_types import (
     DocumentApprovalResponse,
+    DocumentRejectResponse,
+    DocumentVerificationRequest,
     PaginatedVendorsResponse,
     SecurityUpdateResponse,
     UploadDocumentRequest,
@@ -206,6 +208,7 @@ def signin_vendor(
     status_code=status.HTTP_200_OK,
     summary="Approve a vendor document",
     responses={
+        400: {"description": "Invalid request body"},
         403: {"description": "Not authorized to approve documents"},
         404: {"description": "Document not found"},
         409: {"description": "Document already approved/rejected"},
@@ -213,12 +216,20 @@ def signin_vendor(
     }
 )
 def approve_vendor_document(
-    document_id: int,
+    document_id: int,  # From path parameter
+    approval_data: DocumentVerificationRequest,  # From request body
     current_employee: CurrentEmployee,
     db: Session = Depends(get_db)
 ):
     """
     Approve a specific vendor document. Requires employee privileges.
+    
+    Parameters:
+    - document_id: The ID of the document to approve (from URL path)
+    - verification_remarks: Optional remarks about the approval (from request body)
+    
+    Returns:
+        Document approval confirmation with status and metadata
     """
     try:
         if not current_employee.employee_id:
@@ -230,13 +241,17 @@ def approve_vendor_document(
         result = VendorService.approve_vendor_document(
             db=db,
             document_id=document_id,
-            approved_by=current_employee.employee_id
+            approved_by=current_employee.employee_id,
+            remarks=approval_data.verification_remarks
         )
         
         return DocumentApprovalResponse(
             document_id=document_id,
             status=result.verification_status,
-            message="Document approved successfully"
+            message="Document approved successfully",
+            remarks=approval_data.verification_remarks,
+            approved_by=current_employee.employee_id,
+            approved_at=datetime.now()
         )
         
     except HTTPException as he:
@@ -246,6 +261,68 @@ def approve_vendor_document(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Document approval failed"
+        )
+
+@router.post(
+    "/documents/{document_id}/reject",
+    response_model=DocumentRejectResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Reject a vendor document",
+    responses={
+        400: {"description": "Missing rejection remarks"},
+        403: {"description": "Not authorized to reject documents"},
+        404: {"description": "Document not found"},
+        409: {"description": "Document already processed"},
+        500: {"description": "Internal server error"}
+    }
+)
+def reject_vendor_document(
+    document_id: int,
+    reject_data: DocumentVerificationRequest,
+    current_employee: CurrentEmployee,
+    db: Session = Depends(get_db)
+):
+    """
+    Reject a specific vendor document. Requires employee privileges.
+    
+    Parameters:
+    - document_id: The ID of the document to reject (from URL path)
+    - verification_remarks: Mandatory remarks explaining the rejection (from request body)
+    
+    Returns:
+        Document rejection confirmation with status and metadata
+    """
+    try:
+        if not current_employee.employee_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to reject documents"
+            )
+        
+        result = VendorService.reject_vendor_document(
+            db=db,
+            document_id=document_id,
+            rejected_by=current_employee.employee_id,
+            remarks=reject_data.verification_remarks
+        )
+        
+        return DocumentRejectResponse(
+            document_id=document_id,
+            status=result.verification_status,
+            message="Document rejected successfully",
+            remarks=reject_data.verification_remarks,
+            rejected_by=current_employee.employee_id,
+            rejected_at=datetime.now()
+        )
+        
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        db.rollback()
+        print(e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Document rejection failed"
         )
 
 # Profile Management Routes

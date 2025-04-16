@@ -196,23 +196,52 @@ class VendorService:
     def approve_vendor_document(
         db: Session,
         document_id: int,
-        approved_by: int
+        approved_by: int,
+        remarks : str = None
     ) -> VendorDocument:
-        document = db.query(VendorDocument).get(document_id)
+        document: VendorDocument = db.query(VendorDocument).get(document_id)
         if not document:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Document not found"
             )
-        
-        if document.verification_status != VerificationStatus.PENDING.value:
+        print("Document found:", document.verification_status)
+        if document.verification_status == VerificationStatus.VERIFIED.value:  
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Document already processed"
             )
         
         document.verification_status = VerificationStatus.VERIFIED.value
+        document.remarks = remarks
         document.approved_by = approved_by
+        document.approved_at = datetime.now()
+        
+        db.commit()
+        return document
+    
+    @staticmethod
+    def reject_vendor_document(
+        db: Session,
+        document_id: int,
+        rejected_by: int,
+        remarks : str = None
+    ) -> VendorDocument:
+        document: VendorDocument = db.query(VendorDocument).get(document_id)
+        if not document:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document not found"
+            )
+        print("Document found:", document.verification_status)
+        if document.verification_status == VerificationStatus.REJECTED.value:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Document already Rejected"
+            )    
+        document.verification_status = VerificationStatus.REJECTED.value
+        document.remarks = remarks
+        document.approved_by = rejected_by
         document.approved_at = datetime.now()
         
         db.commit()
@@ -347,7 +376,7 @@ class VendorService:
             })
         return {
             **vendor.__dict__,
-            "documents": documents
+            "documents": documents_with_presigned_url
         }
 
     @staticmethod

@@ -1,5 +1,5 @@
 # app/models/vendor_document.py
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Enum, func
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Enum, UniqueConstraint, func
 from sqlalchemy.orm import relationship
 from ..config.database import Base
 import enum
@@ -31,6 +31,7 @@ class VendorDocument(Base):
     verification_status = Column(Enum(VerificationStatus), default=VerificationStatus.PENDING)
     uploaded_at = Column(DateTime, server_default=func.now())
     approved_by = Column(Integer, ForeignKey('employee_hdr.employee_id'), nullable=True)
+    approved_at = Column(DateTime, nullable=True)
     remarks = Column(String(255), nullable=True)
 
     # Relationships

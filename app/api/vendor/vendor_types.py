@@ -1,7 +1,7 @@
 # app/api/vendor/vendor_types.py
 from datetime import datetime
 from typing import List, Optional
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from enum import Enum
 
 from app.models.vendor_document import VerificationStatus
@@ -111,11 +111,40 @@ class VendorPublic(VendorBase):
     class Config:
         from_attributes = True  # Enable ORM mode for SQLAlchemy models
 
+class DocumentVerificationRequest(BaseModel):
+    verification_remarks: Optional[str] = Field(
+        None,
+        description="Optional remarks for the document approval",
+        example="Document looks valid"
+    )
+
+# class DocumentApprovalResponse(BaseModel):
+#     document_id: int
+#     status: str
+#     message: str
+#     remarks: Optional[str] = None
 
 class DocumentApprovalResponse(BaseModel):
     document_id: int
     status: str
     message: str
+    remarks: Optional[str] = None
+    approved_by: int
+    approved_at: datetime
+
+# class DocumentRejectResponse(BaseModel):
+#     document_id: int
+#     status: str
+#     message: str
+#     remarks: Optional[str] = None
+
+class DocumentRejectResponse(BaseModel):
+    document_id: int
+    status: str
+    message: str
+    remarks: str
+    rejected_by: int
+    rejected_at: datetime
 
 class VendorPersonalDetailsUpdate(BaseModel):
     first_name: Optional[str] = None
@@ -150,6 +179,7 @@ class VendorDocumentResponse(BaseModel):
     verification_status: VerificationStatus
     uploaded_at: datetime
     presigned_url: Optional[str] = None
+    remarks: Optional[str] = None
 
 class VendorWithDocumentsResponse(VendorPublic):
     documents: List[VendorDocumentResponse]
