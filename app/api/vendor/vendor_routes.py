@@ -1,4 +1,6 @@
 # app/api/vendor/vendor_routes.py
+from datetime import datetime
+import hashlib
 from typing import List, Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -180,7 +182,7 @@ def get_vendor(
     - vendor_code (string starting with VEND-)
     - vendor_uid (UUID string)
     """
-    return VendorService.get_vendor_with_documents(aws_service,db, identifier)
+    return VendorService.get_vendor_with_documents(aws_service, db, identifier)
 
 @router.post("/signin", response_model=VendorToken)
 def signin_vendor(
@@ -337,7 +339,6 @@ async def upload_vendor_documents(
     vendor_uid: str,
     files: List[UploadFile] = File(...),
     document_types: List[str] = Form(...),
-    document_numbers: List[str] = Form(...),
     db: Session = Depends(get_db)
 ):
     """Upload documents for a vendor"""
@@ -353,7 +354,6 @@ async def upload_vendor_documents(
             vendor_uid,
             files,
             document_types,
-            document_numbers
         )
 
         return {

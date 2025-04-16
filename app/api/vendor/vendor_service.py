@@ -143,14 +143,13 @@ class VendorService:
         vendor_uid: str,
         files: List[UploadFile],
         document_types: List[str],
-        document_numbers: List[str]
     ) -> List[dict]:
         """Upload documents to S3 and return metadata"""
-        if len(files) != len(document_types) or len(files) != len(document_numbers):
+        if len(files) != len(document_types):
             raise HTTPException(400, "Mismatched file/document info count")
 
         results = []
-        for file, doc_type, doc_number in zip(files, document_types, document_numbers):
+        for file, doc_type in zip(files, document_types):
             try:
                 # Validate document type
                 if not hasattr(DocumentTypeEnum, doc_type):
@@ -174,7 +173,6 @@ class VendorService:
 
                 results.append({
                     "document_type": doc_type,
-                    "document_number": doc_number,
                     "s3_key": s3_key
                 })
             except ClientError as e:
