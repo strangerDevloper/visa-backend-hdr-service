@@ -79,7 +79,8 @@ def get_employee_response(employee: EmployeeHdr, db: Session) -> EmployeeRespons
 def get_vendor_response(vendor: Vendor) -> VendorResponse:
     return VendorResponse(
         user_type="vendor",
-        id=vendor.vendor_id,
+        user_id=vendor.vendor_id,
+        username=vendor.vendor_code,
         email=vendor.email,
         name=f"{vendor.first_name} {vendor.last_name}".strip(),
         contact_number=vendor.contact_no,

@@ -63,7 +63,15 @@ class VendorService:
     def get_vendor_by_email(db: Session, email: str) -> Optional[Vendor]:
         """Get vendor by email if exists"""
         return db.query(Vendor).filter(Vendor.email == email).first()
-
+    
+    @staticmethod
+    def get_approve_vendor_by_email(db: Session, email: str) -> Optional[Vendor]:
+        """Get vendor by email if exists and is approved"""
+        return db.query(Vendor).filter(
+            Vendor.email == email,
+            Vendor.status == VendorStatus.APPROVED
+        ).first()
+    
     @staticmethod
     def _get_and_validate_temporary_vendor(db: Session, vendor_uid: str) -> Vendor:
         """Validate vendor exists and is temporary"""
@@ -118,16 +126,13 @@ class VendorService:
     @staticmethod
     def authenticate_vendor(db: Session, email: str, password: str) -> Vendor:
         """Authenticate vendor and return token"""
-        vendor = VendorService.get_vendor_by_email(db, email)
+        vendor = VendorService.get_approve_vendor_by_email(db, email)
         if not vendor or not vendor.password_hash:
             raise HTTPException(status_code=401, detail="Account not approved or invalid email")
         
         if not auth_utils.verify_password(password, vendor.password_hash):
             raise HTTPException(status_code=401, detail="Incorrect password")
-        
-        if vendor.status != VendorStatus.APPROVED.value:
-            raise HTTPException(status_code=403, detail="Account not approved yet")
-        
+
         return vendor
 
     @staticmethod
@@ -137,6 +142,16 @@ class VendorService:
             data={"sub": str(vendor_id)},
             user_type=USER_TYPE_VENDOR
         )
+    
+    @staticmethod
+    def update_login_info(db: Session, vendor_id: int):
+        db_vendor = db.query(Vendor).filter(Vendor.vendor_id == vendor_id).first()
+        if db_vendor:
+            db_vendor.last_login = datetime.utcnow()
+            db_vendor.login_count += 1
+            db.commit()
+            db.refresh(db_vendor)
+        return db_vendor
 
     @staticmethod
     def upload_documents_to_s3(

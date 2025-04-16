@@ -49,6 +49,7 @@ class VendorResponse(BaseUserResponse):
     user_id: int
     email: str
     name: str
+    username: str
     vendor_code: str
     contact_number: str
     address: str

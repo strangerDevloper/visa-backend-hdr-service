@@ -70,6 +70,8 @@ from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from typing import Annotated, Union
+
+from app.models.vendor import VendorStatus
 from ..helpers import auth_utils
 from ..config.database import get_db
 from .. import models
@@ -120,7 +122,7 @@ def get_current_user(request: Request, token: str = Depends(oauth2_scheme), db: 
         db_vendor = db.query(models.Vendor).filter(models.Vendor.vendor_id == user_id).first()
         if not db_vendor:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vendor not found")
-        if db_vendor.status != "APPROVED":
+        if db_vendor.status != VendorStatus.APPROVED:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vendor account not approved")
         return db_vendor
     else:
