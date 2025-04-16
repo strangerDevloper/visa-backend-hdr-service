@@ -400,15 +400,16 @@ def update_vendor_status(
         )
 
 # Profile Management Routes
-@router.get(
-    "/me",
-    response_model=VendorPublic,
-    summary="Get current vendor profile",
-    description="Retrieve the complete profile of the currently authenticated vendor"
-)
-def get_my_profile(current_vendor: CurrentVendor):
-    """Get authenticated vendor's profile"""
-    return current_vendor
+# @router.get(
+#     "/me",
+#     response_model=VendorPublic,
+#     summary="Get current vendor profile",
+#     description="Retrieve the complete profile of the currently authenticated vendor"
+# )
+# def get_my_profile(current_vendor: CurrentVendor):
+#     """Get authenticated vendor's profile"""
+#     print(f"Current Vendor ID: {current_vendor.vendor_id}")
+#     return current_vendor
 
 @router.patch(
     "/me/details",
