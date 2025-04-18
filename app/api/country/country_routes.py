@@ -29,27 +29,37 @@ def create_country(
     - Media files are optional.
     - Each media file includes `file_path`, `is_flag`, and `is_icon`.
     """
-    db_country_name_exists = country_service.get_country_by_name(db, country.country_name)
-    if db_country_name_exists:
+    try:
+        db_country_name_exists = country_service.get_country_by_name(db, country.country_name)
+        if db_country_name_exists:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Country name already exists"
+            )
+
+        db_country_code_exists = country_service.get_country_by_code(db, country.country_code)
+        if db_country_code_exists:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Country code already exists"
+            )
+
+        # Create the country
+        db_country = country_service.create_country(db, country, current_employee.employee_id)
+
+        # # Handle media files (if any)
+        # if country.media_files:
+        #     for media in country.media_files:
+        #         country_service.add_country_media(db, db_country.country_id, media, current_employee.employee_id)
+
+        return db_country
+
+    except HTTPException as http_exc:
+        raise http_exc  # Re-raise HTTP exceptions
+    except Exception as e:
+        db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Country name already exists"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred while creating the country: {str(e)}"
         )
-
-    db_country_code_exists = country_service.get_country_by_code(db, country.country_code)
-    if db_country_code_exists:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Country code already exists"
-        )
-
-    # Create the country
-    db_country = country_service.create_country(db, country, current_employee.employee_id)
-
-    # # Handle media files (if any)
-    # if country.media_files:
-    #     for media in country.media_files:
-    #         country_service.add_country_media(db, db_country.country_id, media, current_employee.employee_id)
-
-    return db_country
 
 @router.get("/{country_id}", response_model=country_types.CountryWithMedia)
 def get_country(
@@ -115,18 +125,25 @@ def update_country(
 
     return updated_country
 
-@router.delete("/{country_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{country_id}", status_code=status.HTTP_200_OK)
 def delete_country(
     country_id: int,
     current_employee: CurrentEmployee,
     db: Session = Depends(get_db),
 ):
     """Deactivates a country."""
-    db_country = country_service.get_country(db, country_id)
-    if not db_country:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Country not found")
-    country_service.deactivate_country(db, country_id, current_employee.employee_id)
-    return JSONResponse(status_code=status.HTTP_204_NO_CONTENT)
+    try:
+        db_country = country_service.get_country(db, country_id)
+        if not db_country:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Country not found")
+        
+        country_service.deactivate_country(db, country_id, current_employee.employee_id)
+        return {"message": "Country deactivated successfully"}
+    except HTTPException as http_exc:
+        raise http_exc  # Re-raise HTTP exceptions
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @router.post("/{country_id}/upload-media")
 async def upload_country_media(
