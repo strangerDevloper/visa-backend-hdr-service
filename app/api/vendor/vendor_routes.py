@@ -9,7 +9,7 @@ from app.api.vendor.vendor_service import VendorService
 from app.config.database import get_db
 from app.helpers.email_utils import email_sender
 from app.config.aws import AWSService
-from ..dependencies import CurrentEmployee, CurrentVendor  # Updated imports
+from ..dependencies import CurrentEmployee, CurrentUser, CurrentVendor  # Updated imports
 from .vendor_types import (
     DocumentApprovalResponse,
     DocumentRejectResponse,
@@ -412,7 +412,7 @@ def update_vendor_status(
 #     return current_vendor
 
 @router.patch(
-    "/me/details",
+    "/{vendor_id}/update",
     response_model=VendorPublic,
     summary="Update vendor personal details",
     description="Update basic personal information of the vendor",
@@ -422,8 +422,9 @@ def update_vendor_status(
     }
 )
 def update_personal_details(
+    vendor_id: int,
     updates: VendorPersonalDetailsUpdate,
-    current_vendor: CurrentVendor,
+    current_user: CurrentUser,
     db: Session = Depends(get_db)
 ):
     """
@@ -434,9 +435,21 @@ def update_personal_details(
     - Address details
     """
     try:
+        if hasattr(current_user, "employee_id"):
+            # Employee-specific logic: Allow update
+            pass
+        elif hasattr(current_user, "vendor_id") and current_user.vendor_id == vendor_id:
+            # Vendor-specific logic: Allow update if vendor_id matches
+            pass
+        else:
+            raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to update this vendor's details"
+            )
+
         updated_vendor = VendorService.update_vendor_personal_details(
             db=db,
-            vendor_id=current_vendor.vendor_id,
+            vendor_id=vendor_id,
             updates=updates
         )
         return updated_vendor
@@ -450,32 +463,52 @@ def update_personal_details(
         )
 
 @router.patch(
-    "/me/security",
+    "/{vendor_id}/security",
     response_model=SecurityUpdateResponse,
     summary="Update security information",
     description="Update sensitive security information like email or password",
     responses={
-        400: {"description": "Invalid current password"},
+        400: {"description": "Invalid current password (for vendors only)"},
         500: {"description": "Failed to update security information"}
     }
 )
 def update_security_info(
+    vendor_id: int,
     updates: VendorSecurityUpdate,
-    current_vendor: CurrentVendor,
+    current_user: CurrentUser,
     db: Session = Depends(get_db)
 ):
     """
-    Update vendor's security information including:
-    - Email address
-    - Password (requires current password verification)
+    Update security information for both vendors and employees:
+    - Vendors: Verify current password before updating
+    - Employees: Update without verifying current password
     """
     try:
-        result = VendorService.update_vendor_security(
-            db=db,
-            vendor_id=current_vendor.vendor_id,
-            current_password=current_vendor.password_hash,
-            updates=updates
-        )
+        if hasattr(current_user, "vendor_id") and current_user.vendor_id == vendor_id:
+            # Vendor-specific logic: Verify current password
+            print("vendor here")
+            result = VendorService.update_vendor_security(
+                db=db,
+                vendor_id=vendor_id,
+                current_password=updates.current_password,
+                updates=updates,
+                verify_current_password=True
+            )
+        elif hasattr(current_user, "employee_id"):
+            print("employee here")
+            # Employee-specific logic: No need to verify current password
+            result = VendorService.update_vendor_security(
+                db=db,
+                vendor_id=vendor_id,
+                current_password=None,
+                updates=updates,
+                verify_current_password=False
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to update this vendor's security information"
+            )
         return result
     except HTTPException as he:
         raise he

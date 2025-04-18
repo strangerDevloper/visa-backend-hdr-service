@@ -400,9 +400,10 @@ class VendorService:
         db: Session,
         vendor_id: int,
         current_password: str,
-        updates: VendorSecurityUpdate
+        updates: VendorSecurityUpdate,
+        verify_current_password: bool = True
     ) -> SecurityUpdateResponse:
-        vendor = db.query(Vendor).get(vendor_id)
+        vendor : Vendor = db.query(Vendor).get(vendor_id)
         if not vendor:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -411,9 +412,9 @@ class VendorService:
         
         response = SecurityUpdateResponse()
         
-        # Verify current password if changing password
+        # Verify current password if changing password and verification is required
         if updates.new_password:
-            if not auth_utils.verify_password(updates.current_password, current_password):
+            if verify_current_password and not auth_utils.verify_password(updates.current_password, current_password):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Current password is incorrect"
