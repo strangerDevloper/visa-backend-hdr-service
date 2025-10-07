@@ -152,56 +152,44 @@ def get_employees(
     role_id: Optional[int] = None
 ) -> Tuple[List[models.EmployeeHdr], int]:
     """
-    Get a list of employees with pagination and optional filtering by:
-    - visa access (country_id and/or visa_process_id)
-    - role assignment (role_id)
+    Get a list of active employees with pagination and optional filtering.
     """
     query = db.query(models.EmployeeHdr).filter(models.EmployeeHdr.active_status == True)
     
-    # We'll collect all subqueries for different filters
-    subqueries = []
-    
-    # Filter by visa access if provided
+    # Join with visa access table if either country_id or visa_process_id is provided
     if country_id is not None or visa_process_id is not None:
-        access_query = db.query(models.EmployeeVisaTypeAccess.employee_id)
+        query = query.join(
+            models.EmployeeVisaTypeAccess,
+            models.EmployeeHdr.employee_id == models.EmployeeVisaTypeAccess.employee_id  # Explicit join condition
+        )
         
         if country_id is not None:
-            access_query = access_query.filter(
+            query = query.filter(
                 models.EmployeeVisaTypeAccess.country_id == country_id
             )
         
         if visa_process_id is not None:
-            access_query = access_query.filter(
+            query = query.filter(
                 models.EmployeeVisaTypeAccess.visa_process_id == visa_process_id
             )
         
-        subqueries.append(access_query.distinct())
+        query = query.distinct(models.EmployeeHdr.employee_id)
     
-    # Filter by role if provided
+    # Join with role table if role_id is provided
     if role_id is not None:
-        role_query = db.query(models.EmployeeRole.employee_id).filter(
+        query = query.join(
+            models.EmployeeRole,
+            models.EmployeeHdr.employee_id == models.EmployeeRole.employee_id  # Explicit join condition
+        ).filter(
             models.EmployeeRole.role_id == role_id
         )
-        subqueries.append(role_query.distinct())
-    
-    # Apply all filters if any exist
-    if subqueries:
-        # Start with the first subquery
-        combined_query = subqueries[0]
-        
-        # Intersect with additional subqueries (AND condition)
-        for subq in subqueries[1:]:
-            combined_query = combined_query.intersect(subq)
-        
-        employee_ids = combined_query.subquery()
-        query = query.join(
-            employee_ids,
-            models.EmployeeHdr.employee_id == employee_ids.c.employee_id
-        )
+        query = query.distinct(models.EmployeeHdr.employee_id)
     
     total_count = query.count()
     employees = query.offset(skip).limit(limit).all()
+    
     return employees, total_count
+
 
 def update_employee(db: Session, employee_id: int, employee_update: employee_types.EmployeeUpdate, modified_by: int = None):
     """
